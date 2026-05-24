@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ConnectHub - Réseau Social</title>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; }
+        header { background-color: #4267B2; color: white; padding: 1rem; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        main { padding: 2rem; max-width: 800px; margin: auto; }
+        .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Composant principal de l'application
+        function App() {
+            // Utilisation du state pour préparer le dynamisme
+            const [message, setMessage] = React.useState("Bienvenue sur ConnectHub !");
+
+            return (
+                <div>
+                    <header>
+                        <h1>ConnectHub</h1>
+                    </header>
+                    <main>
+                        <div className="card">
+                            <h2>{message}</h2>
+                            <p>L'interface React est correctement initialisée et prête à être développée.</p>
+                        </div>
+                        {/* Plus tard, nous ajouterons ici les composants <FilActualite />, <Login />, etc. */}
+                    </main>
+                </div>
+            );
+        }
+
+        // Rendu du composant App dans la div #root
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+
+</body>
+</html>
