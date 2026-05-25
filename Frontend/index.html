@@ -3,35 +3,146 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ConnectHub - Réseau Social</title>
+    <title>ConnectHub - Sport & Performance</title>
 
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f0f2f5; }
-        header { background-color: #4267B2; color: white; padding: 1rem; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        main { padding: 2rem; max-width: 800px; margin: auto; }
-        .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 1.5rem; }
-        button { background-color: #4267B2; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-size: 1rem; }
-        button:hover { background-color: #365899; }
-        
-        /* Styles pour la navigation */
-        .nav-tabs { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
-        .nav-tab { padding: 0.5rem 1rem; cursor: pointer; border-radius: 4px; font-weight: bold; }
-        .nav-tab.active { background-color: #4267B2; color: white; }
-        .nav-tab.inactive { background-color: #ddd; color: #333; }
+        /* === NOUVELLE DA : NOIR ET ORANGE === */
+        :root {
+            --bg-dark: #121212;
+            --bg-card: #1e1e1e;
+            --orange-primary: #FF6B00;
+            --orange-hover: #e65c00;
+            --text-light: #f5f5f5;
+            --text-muted: #aaaaaa;
+            --border-color: #333333;
+        }
 
-        /* Styles pour les publications */
-        .post { border-bottom: 1px solid #eee; padding-bottom: 1rem; margin-bottom: 1rem; }
-        .post-header { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
-        .post-author { font-weight: bold; color: #4267B2; }
-        .post-date { color: #666; font-size: 0.85rem; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            background-color: var(--bg-dark); 
+            color: var(--text-light);
+            padding-bottom: 70px; /* Espace pour la barre de navigation en bas */
+        }
+
+        /* En-tête haut */
+        .top-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background-color: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        /* Profil / Connexion (Haut Gauche) */
+        .profile-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: none;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .profile-pic {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: var(--border-color);
+            border: 2px solid var(--orange-primary);
+            object-fit: cover;
+        }
+
+        /* Contenu principal */
+        main { padding: 1rem; max-width: 600px; margin: auto; }
+
+        .card { 
+            background: var(--bg-card); 
+            padding: 1.5rem; 
+            border-radius: 12px; 
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        /* Formulaire & Boutons */
+        textarea, input {
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            width: 100%;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        textarea:focus, input:focus { outline: none; border-color: var(--orange-primary); }
         
-        .user-list { margin-top: 1rem; padding-left: 0; list-style-type: none; }
-        .user-item { background: #f8f9fa; padding: 0.75rem; border-bottom: 1px solid #ddd; margin-bottom: 0.5rem; border-radius: 4px; }
-        .badge { background: #28a745; color: white; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; float: right; }
+        .btn-primary { 
+            background-color: var(--orange-primary); 
+            color: white; 
+            border: none; 
+            padding: 0.75rem 1.5rem; 
+            border-radius: 25px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+        .btn-primary:hover { background-color: var(--orange-hover); }
+
+        /* Publications */
+        .post { border-bottom: 1px solid var(--border-color); padding-bottom: 1.5rem; margin-bottom: 1.5rem; }
+        .post:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .post-header { display: flex; justify-content: space-between; margin-bottom: 0.8rem; align-items: center; }
+        .post-author { font-weight: bold; color: var(--orange-primary); font-size: 1.1rem; }
+        .post-date { color: var(--text-muted); font-size: 0.85rem; }
+        .btn-like {
+            background-color: transparent;
+            color: var(--text-light);
+            border: 1px solid var(--border-color);
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-like:hover, .btn-like.active { border-color: var(--orange-primary); color: var(--orange-primary); }
+
+        /* Navigation Bas (Mobile/App style) */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: var(--bg-card);
+            display: flex;
+            justify-content: space-around;
+            padding: 0.8rem 0;
+            border-top: 1px solid var(--border-color);
+            z-index: 100;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.8rem;
+            gap: 0.3rem;
+        }
+        .nav-item.active { color: var(--orange-primary); }
+        .nav-icon { font-size: 1.5rem; }
     </style>
 </head>
 <body>
@@ -40,18 +151,163 @@
 
     <script type="text/babel">
 
-        // ==========================================
-        // COMPOSANT 1 : FIL D'ACTUALITÉ
-        // ==========================================
-        // ==========================================
-        // COMPOSANT 1 : FIL D'ACTUALITÉ (Connecté à la BDD)
-        // ==========================================
-        function FilActualite() {
-            const [publications, setPublications] = React.useState([]);
-            const [nouveauMessage, setNouveauMessage] = React.useState("");
+        // --- COMPOSANT COMMUNAUTÉS (Connecté à la BDD) ---
+        function Communautes({ utilisateurConnecte }) {
+            const [listeCommunautes, setListeCommunautes] = React.useState([]);
             const [chargement, setChargement] = React.useState(true);
 
-            // Charger les publications au démarrage du composant
+            // Charger les communautés depuis PHP
+            React.useEffect(() => {
+                fetch("../Backend/get_communautes.php")
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.erreur) console.error(data.erreur);
+                        else setListeCommunautes(data);
+                        setChargement(false);
+                    })
+                    .catch(error => {
+                        console.error("Erreur:", error);
+                        setChargement(false);
+                    });
+            }, []);
+
+            const handleRejoindre = (id) => {
+                if (!utilisateurConnecte) {
+                    alert("Vous devez vous connecter pour rejoindre un groupe d'entraînement.");
+                    return;
+                }
+                // Pour l'instant, c'est une simple alerte. Nous pourrons coder l'insertion PHP plus tard !
+                alert("Fonctionnalité 'Rejoindre' en cours de développement !");
+            };
+
+            return (
+                <div>
+                    <div className="card" style={{ marginBottom: '2rem' }}>
+                        <h2 style={{ color: 'var(--orange-primary)', marginTop: 0 }}>Groupes d'entraînement</h2>
+                        <p style={{ color: 'var(--text-muted)' }}>Trouvez des partenaires et partagez vos routines spécifiques.</p>
+                        
+                        {/* Bouton pour créer une communauté (visuel pour l'instant) */}
+                        <button className="btn-primary" style={{ width: '100%' }} onClick={() => alert("Bientôt possible !")}>
+                            + Créer une nouvelle communauté
+                        </button>
+                    </div>
+
+                    {chargement ? (
+                        <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Recherche des groupes...</p>
+                    ) : listeCommunautes.length === 0 ? (
+                        <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucun groupe pour le moment.</p>
+                    ) : (
+                        listeCommunautes.map(communaute => (
+                            <div key={communaute.ID} className="card" style={{ borderLeft: '4px solid var(--orange-primary)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{communaute.Nom}</h3>
+                                    <span style={{ backgroundColor: '#333', padding: '0.2rem 0.6rem', borderRadius: '15px', fontSize: '0.8rem' }}>
+                                        👥 {communaute.NbMembres} membres
+                                    </span>
+                                </div>
+                                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                                    Créé par {communaute.Createur}
+                                </p>
+                                <p style={{ lineHeight: '1.4', marginBottom: '1.5rem' }}>
+                                    {communaute.Description}
+                                </p>
+                                <button 
+                                    onClick={() => handleRejoindre(communaute.ID)}
+                                    style={{ 
+                                        backgroundColor: 'transparent', 
+                                        color: 'var(--orange-primary)', 
+                                        border: '1px solid var(--orange-primary)', 
+                                        padding: '0.5rem 1rem', 
+                                        borderRadius: '20px', 
+                                        cursor: 'pointer',
+                                        width: '100%',
+                                        fontWeight: 'bold'
+                                    }}
+                                >
+                                    Rejoindre le groupe
+                                </button>
+                            </div>
+                        ))
+                    )}
+                </div>
+            );
+        }
+
+        // --- COMPOSANT PLACEHOLDER MESSAGES ---
+        function Messages() {
+            return (
+                <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+                    <h2 style={{ color: 'var(--orange-primary)' }}>Messagerie</h2>
+                    <p>Discutez de vos objectifs avec d'autres athlètes. Bientôt disponible !</p>
+                </div>
+            );
+        }
+
+        // --- NOUVEAU COMPOSANT : CONNEXION / INSCRIPTION ---
+        function Authentification({ onConnect }) {
+            const [isLogin, setIsLogin] = React.useState(true);
+            const [formData, setFormData] = React.useState({ nom: '', email: '', motDePasse: '' });
+            const [message, setMessage] = React.useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                setMessage("Chargement...");
+                
+                // Le fetch pointe vers login.php ou inscription.php selon le mode
+                const url = isLogin ? "../Backend/login.php" : "../Backend/inscription.php";
+                
+                fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(formData)
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.erreur) {
+                        setMessage("❌ " + data.erreur);
+                    } else {
+                        if (isLogin) {
+                            setMessage("✅ Connexion réussie !");
+                            onConnect(data.utilisateur); // Transmet l'utilisateur au composant principal
+                        } else {
+                            setMessage("✅ Inscription réussie ! Vous pouvez maintenant vous connecter.");
+                            setIsLogin(true); // Bascule sur l'onglet connexion
+                        }
+                    }
+                })
+                .catch(() => setMessage("❌ Erreur de communication avec le serveur."));
+            };
+
+            return (
+                <div className="card">
+                    <h2 style={{ color: 'var(--orange-primary)' }}>{isLogin ? "Se connecter" : "Créer un compte"}</h2>
+                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {!isLogin && (
+                            <input type="text" placeholder="Nom complet" value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} required />
+                        )}
+                        <input type="email" placeholder="Adresse Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required />
+                        <input type="password" placeholder="Mot de passe" value={formData.motDePasse} onChange={e => setFormData({...formData, motDePasse: e.target.value})} required />
+                        
+                        <button type="submit" className="btn-primary">{isLogin ? "Connexion" : "S'inscrire"}</button>
+                    </form>
+                    <p style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem' }}>
+                        {isLogin ? "Pas encore de compte ? " : "Déjà un compte ? "}
+                        <span style={{ color: 'var(--orange-primary)', cursor: 'pointer', fontWeight: 'bold' }} onClick={() => setIsLogin(!isLogin)}>
+                            {isLogin ? "S'inscrire" : "Se connecter"}
+                        </span>
+                    </p>
+                    {message && <p style={{ fontWeight: 'bold', textAlign: 'center', marginTop: '1rem' }}>{message}</p>}
+                </div>
+            );
+        }
+
+        // --- COMPOSANT FIL D'ACTUALITÉ ---
+        // Il reçoit désormais "utilisateurConnecte" en paramètre (les props)
+        function FilActualite({ utilisateurConnecte }) {
+            const [nouveauMessage, setNouveauMessage] = React.useState("");
+            const [publications, setPublications] = React.useState([]);
+            const [chargement, setChargement] = React.useState(true);
+
             const chargerPublications = () => {
                 fetch("../Backend/get_publications.php")
                     .then(response => response.json())
@@ -60,25 +316,22 @@
                         else setPublications(data);
                         setChargement(false);
                     })
-                    .catch(error => {
-                        console.error("Erreur de connexion:", error);
-                        setChargement(false);
-                    });
+                    .catch(error => { console.error("Erreur:", error); setChargement(false); });
             };
 
-            // useEffect permet de lancer la fonction une seule fois au chargement
-            React.useEffect(() => {
-                chargerPublications();
-            }, []);
+            React.useEffect(() => { chargerPublications(); }, []);
 
             const handlePublier = (e) => {
                 e.preventDefault();
                 
-                // On simule que l'utilisateur avec l'ID 1 est connecté
-                const postData = {
-                    contenu: nouveauMessage,
-                    auteur_id: 1 
-                };
+                // On vérifie d'abord si l'utilisateur est bien connecté !
+                if (!utilisateurConnecte) {
+                    alert("Vous devez vous connecter pour partager vos performances.");
+                    return;
+                }
+
+                // On utilise le véritable ID de la personne connectée
+                const postData = { contenu: nouveauMessage, auteur_id: utilisateurConnecte.ID };
 
                 fetch("../Backend/ajouter_publication.php", {
                     method: "POST",
@@ -87,21 +340,22 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.erreur) {
-                        alert(data.erreur);
-                    } else {
-                        setNouveauMessage(""); // On vide le champ
-                        chargerPublications(); // On rafraîchit le fil d'actualité
+                    if (data.erreur) alert(data.erreur);
+                    else {
+                        setNouveauMessage(""); 
+                        chargerPublications(); 
                     }
                 });
             };
-            const gererLike = (publicationId) => {
-                // Simulation de l'utilisateur connecté (ID 1)
-                const dataLike = {
-                    publication_id: publicationId,
-                    utilisateur_id: 1 
-                };
 
+            const gererLike = (publicationId) => {
+                if (!utilisateurConnecte) {
+                    alert("Vous devez vous connecter pour soutenir un athlète.");
+                    return;
+                }
+
+                const dataLike = { publication_id: publicationId, utilisateur_id: utilisateurConnecte.ID };
+                
                 fetch("../Backend/liker_publication.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -109,36 +363,31 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.erreur) {
-                        console.error(data.erreur);
-                    } else {
-                        // Rafraîchir les publications pour mettre à jour le compteur
-                        chargerPublications();
-                    }
+                    if (data.erreur) console.error(data.erreur);
+                    else chargerPublications(); 
                 });
             };
-            return (
-                <div className="card">
-                    <h2>Fil d'actualité</h2>
-                    
-                    {/* Formulaire de publication */}
-                    <form onSubmit={handlePublier} style={{ marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <textarea 
-                            value={nouveauMessage}
-                            onChange={(e) => setNouveauMessage(e.target.value)}
-                            placeholder="Partagez quelque chose avec la communauté..."
-                            style={{ width: '100%', padding: '0.75rem', minHeight: '80px', borderRadius: '4px', border: '1px solid #ccc', resize: 'vertical', boxSizing: 'border-box' }}
-                            required
-                        />
-                        <button type="submit" style={{ alignSelf: 'flex-end' }}>Publier</button>
-                    </form>
 
-                    {/* Affichage des publications */}
-                    <div>
+            return (
+                <div>
+                    <div className="card">
+                        <form onSubmit={handlePublier} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                            <textarea 
+                                value={nouveauMessage}
+                                onChange={(e) => setNouveauMessage(e.target.value)}
+                                placeholder="Partagez vos performances, vos photos ou vos objectifs..."
+                                rows="3"
+                                required
+                            />
+                            <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-end' }}>Partager</button>
+                        </form>
+                    </div>
+
+                    <div className="card">
                         {chargement ? (
-                            <p>Chargement des publications...</p>
+                            <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Chargement des performances...</p>
                         ) : publications.length === 0 ? (
-                            <p>Aucune publication pour le moment. Soyez le premier à poster !</p>
+                            <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucune publication. Soyez le premier à partager votre entraînement !</p>
                         ) : (
                             publications.map(pub => (
                                 <div key={pub.ID} className="post">
@@ -146,20 +395,14 @@
                                         <span className="post-author">{pub.Nom}</span>
                                         <span className="post-date">{pub.Date_Publication}</span>
                                     </div>
+                                    <p style={{ margin: '0 0 1rem 0', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{pub.Contenu}</p>
                                     
-                                    {/* Texte du message */}
-                                    <p style={{ margin: '0 0 1rem 0', whiteSpace: 'pre-wrap' }}>{pub.Contenu}</p>
-                                    
-                                    {/* BOUTON LIKE ET COMPTEUR */}
                                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                        <button 
-                                            onClick={() => gererLike(pub.ID)}
-                                            style={{ backgroundColor: 'transparent', color: '#4267B2', border: '1px solid #4267B2', padding: '0.2rem 0.8rem', borderRadius: '20px' }}
-                                        >
-                                            👍 J'aime
+                                        <button className="btn-like" onClick={() => gererLike(pub.ID)}>
+                                            🔥 Respect
                                         </button>
-                                        <span style={{ fontSize: '0.9rem', color: '#666' }}>
-                                            {pub.NbLikes || 0} {pub.NbLikes > 1 ? "personnes aiment" : "personne aime"} ça
+                                        <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                                            {pub.NbLikes || 0} soutiens
                                         </span>
                                     </div>
                                 </div>
@@ -170,111 +413,83 @@
             );
         }
 
-        // ==========================================
-        // COMPOSANT 2 : GESTION DES MEMBRES (Déjà développé)
-        // ==========================================
-        function GestionMembres() {
-            const [listeUtilisateurs, setListeUtilisateurs] = React.useState([]);
-            const [chargement, setChargement] = React.useState(false);
-            const [formData, setFormData] = React.useState({ nom: '', email: '', motDePasse: '' });
-            const [messageInscription, setMessageInscription] = React.useState('');
-
-            const chargerUtilisateurs = () => {
-                setChargement(true);
-                fetch("../Backend/get_utilisateurs.php")
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.erreur) alert(data.erreur);
-                        else setListeUtilisateurs(data);
-                        setChargement(false);
-                    })
-                    .catch(error => { console.error("Erreur:", error); setChargement(false); });
-            };
-
-            const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                setMessageInscription("Inscription en cours...");
-                fetch("../Backend/inscription.php", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(formData)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.erreur) setMessageInscription("❌ " + data.erreur);
-                    else {
-                        setMessageInscription("✅ " + data.succes);
-                        setFormData({ nom: '', email: '', motDePasse: '' });
-                        chargerUtilisateurs();
-                    }
-                })
-                .catch(() => setMessageInscription("❌ Erreur de connexion au serveur."));
-            };
-
-            return (
-                <div>
-                    <div className="card">
-                        <h2>Créer un compte</h2>
-                        <form onSubmit={handleSubmit}>
-                            <div style={{ marginBottom: '1rem' }}><input type="text" name="nom" value={formData.nom} onChange={handleChange} placeholder="Nom complet" required style={{ width: '95%', padding: '0.5rem' }} /></div>
-                            <div style={{ marginBottom: '1rem' }}><input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Adresse Email" required style={{ width: '95%', padding: '0.5rem' }} /></div>
-                            <div style={{ marginBottom: '1rem' }}><input type="password" name="motDePasse" value={formData.motDePasse} onChange={handleChange} placeholder="Mot de passe" required style={{ width: '95%', padding: '0.5rem' }} /></div>
-                            <button type="submit">S'inscrire</button>
-                        </form>
-                        {messageInscription && <p>{messageInscription}</p>}
-                    </div>
-
-                    <div className="card">
-                        <h2>Membres de la communauté</h2>
-                        <button onClick={chargerUtilisateurs} style={{ marginBottom: '1rem' }}>Rafraîchir la liste</button>
-                        <ul className="user-list">
-                            {listeUtilisateurs.map(user => (
-                                <li key={user.ID} className="user-item">
-                                    <strong>{user.Nom}</strong> ({user.Email}) <span className="badge">{user.Role}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                </div>
-            );
-        }
-
-        // ==========================================
-        // COMPOSANT PRINCIPAL (App)
-        // ==========================================
+        // --- COMPOSANT PRINCIPAL ---
         function App() {
-            // État pour gérer la navigation (onglets)
-            const [ongletActif, setOngletActif] = React.useState('fil');
+            const [ongletActif, setOngletActif] = React.useState('accueil');
+            const [utilisateurConnecte, setUtilisateurConnecte] = React.useState(null); 
 
             return (
                 <div>
-                    <header>
-                        <h1>ConnectHub</h1>
-                        <p>Le réseau des étudiants en échange</p>
-                    </header>
-                    <main>
-                        {/* Menu de navigation */}
-                        <div className="nav-tabs">
-                            <div 
-                                className={`nav-tab ${ongletActif === 'fil' ? 'active' : 'inactive'}`} 
-                                onClick={() => setOngletActif('fil')}
-                            >
-                                Fil d'actualité
-                            </div>
-                            <div 
-                                className={`nav-tab ${ongletActif === 'membres' ? 'active' : 'inactive'}`} 
-                                onClick={() => setOngletActif('membres')}
-                            >
-                                Inscription & Membres
-                            </div>
-                        </div>
+                    <header className="top-header">
+                        {/* Bouton pour ouvrir la page de Profil ou de Connexion */}
+                        <button className="profile-btn" onClick={() => setOngletActif('profil')}>
+                            {utilisateurConnecte ? (
+                                <>
+                                    {/* Affiche la première lettre du nom de l'utilisateur comme avatar */}
+                                    <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#333' }}>
+                                        {utilisateurConnecte.Nom.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span>{utilisateurConnecte.Nom}</span>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#333' }}>👤</div>
+                                    <span>Se connecter</span>
+                                </>
+                            )}
+                        </button>
 
-                        {/* Affichage conditionnel selon l'onglet choisi */}
-                        {ongletActif === 'fil' && <FilActualite />}
-                        {ongletActif === 'membres' && <GestionMembres />}
+                        <h1 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--orange-primary)', letterSpacing: '1px' }}>
+                            CONNECT<span style={{ color: 'white' }}>HUB</span>
+                        </h1>
+                    </header>
+
+                    <main>
+                        {/* Gestion de l'affichage de l'onglet de profil / connexion */}
+                        {ongletActif === 'profil' && (
+                            utilisateurConnecte ? (
+                                <div className="card" style={{ textAlign: 'center' }}>
+                                    <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🏅</div>
+                                    <h2 style={{ color: 'var(--orange-primary)' }}>Profil de {utilisateurConnecte.Nom}</h2>
+                                    <p style={{ color: 'var(--text-muted)' }}>{utilisateurConnecte.Email}</p>
+                                    <p style={{ color: 'var(--text-muted)' }}>Rôle : {utilisateurConnecte.Role}</p>
+                                    <button 
+                                        className="btn-primary" 
+                                        style={{ marginTop: '1.5rem', backgroundColor: '#333' }}
+                                        onClick={() => { setUtilisateurConnecte(null); setOngletActif('accueil'); }}
+                                    >
+                                        Se déconnecter
+                                    </button>
+                                </div>
+                            ) : (
+                                <Authentification onConnect={(user) => { 
+                                    setUtilisateurConnecte(user); 
+                                    setOngletActif('accueil'); // Retour au fil d'actualité après la connexion
+                                }} />
+                            )
+                        )}
+
+                        {ongletActif === 'communautes' && <Communautes />}
+                        {ongletActif === 'accueil' && <FilActualite utilisateurConnecte={utilisateurConnecte} />}
+                        {ongletActif === 'messages' && <Messages />}
                     </main>
+
+                    <nav className="bottom-nav">
+                        <div className={`nav-item ${ongletActif === 'communautes' ? 'active' : ''}`} onClick={() => setOngletActif('communautes')}>
+                            <span className="nav-icon">👥</span>
+                            <span>Communautés</span>
+                        </div>
+                        
+                        <div className={`nav-item ${ongletActif === 'accueil' ? 'active' : ''}`} onClick={() => setOngletActif('accueil')}>
+                            <span className="nav-icon" style={{ fontSize: '1.8rem', color: ongletActif === 'accueil' ? 'var(--orange-primary)' : 'inherit' }}>🏠</span>
+                            <span>Accueil</span>
+                        </div>
+                        
+                        <div className={`nav-item ${ongletActif === 'messages' ? 'active' : ''}`} onClick={() => setOngletActif('messages')}>
+                            <span className="nav-icon">💬</span>
+                            <span>Messages</span>
+                        </div>
+                    </nav>
                 </div>
             );
         }
