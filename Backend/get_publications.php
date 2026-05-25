@@ -2,7 +2,8 @@
 require_once("config.php");
 
 // Requête SQL avec jointure pour lier le message à son auteur
-$sql = "SELECT p.ID, u.Nom, p.Contenu, p.Date_Publication 
+$sql = "SELECT p.ID, u.Nom, p.Contenu, p.Date_Publication, 
+        (SELECT COUNT(*) FROM Likes WHERE Publication_ID = p.ID) as NbLikes
         FROM Publications p 
         JOIN Utilisateurs u ON p.Auteur_ID = u.ID 
         ORDER BY p.Date_Publication DESC";

@@ -95,11 +95,33 @@
                     }
                 });
             };
+            const gererLike = (publicationId) => {
+                // Simulation de l'utilisateur connecté (ID 1)
+                const dataLike = {
+                    publication_id: publicationId,
+                    utilisateur_id: 1 
+                };
 
+                fetch("../Backend/liker_publication.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(dataLike)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.erreur) {
+                        console.error(data.erreur);
+                    } else {
+                        // Rafraîchir les publications pour mettre à jour le compteur
+                        chargerPublications();
+                    }
+                });
+            };
             return (
                 <div className="card">
                     <h2>Fil d'actualité</h2>
                     
+                    {/* Formulaire de publication */}
                     <form onSubmit={handlePublier} style={{ marginBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         <textarea 
                             value={nouveauMessage}
@@ -111,6 +133,7 @@
                         <button type="submit" style={{ alignSelf: 'flex-end' }}>Publier</button>
                     </form>
 
+                    {/* Affichage des publications */}
                     <div>
                         {chargement ? (
                             <p>Chargement des publications...</p>
@@ -123,7 +146,22 @@
                                         <span className="post-author">{pub.Nom}</span>
                                         <span className="post-date">{pub.Date_Publication}</span>
                                     </div>
-                                    <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{pub.Contenu}</p>
+                                    
+                                    {/* Texte du message */}
+                                    <p style={{ margin: '0 0 1rem 0', whiteSpace: 'pre-wrap' }}>{pub.Contenu}</p>
+                                    
+                                    {/* BOUTON LIKE ET COMPTEUR */}
+                                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                        <button 
+                                            onClick={() => gererLike(pub.ID)}
+                                            style={{ backgroundColor: 'transparent', color: '#4267B2', border: '1px solid #4267B2', padding: '0.2rem 0.8rem', borderRadius: '20px' }}
+                                        >
+                                            👍 J'aime
+                                        </button>
+                                        <span style={{ fontSize: '0.9rem', color: '#666' }}>
+                                            {pub.NbLikes || 0} {pub.NbLikes > 1 ? "personnes aiment" : "personne aime"} ça
+                                        </span>
+                                    </div>
                                 </div>
                             ))
                         )}
