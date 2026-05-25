@@ -150,14 +150,326 @@
     <div id="root"></div>
 
     <script type="text/babel">
+        // --- COMPOSANT PROFIL / PARAMÈTRES ---
+        function Profil({ utilisateurConnecte, setUtilisateurConnecte, setOngletActif }) {
+            const [modeEdition, setModeEdition] = React.useState(false);
+            const [formData, setFormData] = React.useState({ nom: '', email: '', motDePasse: '' });
+            const [message, setMessage] = React.useState('');
 
-        // --- COMPOSANT COMMUNAUTÉS (Connecté à la BDD) ---
+            // Quand on clique sur "Modifier", on pré-remplit le formulaire avec les infos actuelles
+            const lancerEdition = () => {
+                setFormData({ nom: utilisateurConnecte.Nom, email: utilisateurConnecte.Email, motDePasse: '' });
+                setModeEdition(true);
+                setMessage('');
+            };
+
+            const handleSauvegarder = (e) => {
+                e.preventDefault();
+                
+                const dataToUpdate = {
+                    id: utilisateurConnecte.ID,
+                    nom: formData.nom,
+                    email: formData.email,
+                    motDePasse: formData.motDePasse // Sera vide si l'utilisateur ne le modifie pas
+                };
+
+                fetch("../Backend/modifier_profil.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(dataToUpdate)
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.erreur) {
+                        setMessage("❌ " + data.erreur);
+                    } else {
+                        setMessage("✅ " + data.succes);
+                        setUtilisateurConnecte(data.utilisateur); // Met à jour l'état global avec le nouveau nom/email
+                        setModeEdition(false); // Repasse en vue normale
+                    }
+                })
+                .catch(() => setMessage("❌ Erreur de communication avec le serveur."));
+            };
+
+            return (
+                <div className="card" style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🏅</div>
+                    
+                    {!modeEdition ? (
+                        // VUE LECTURE (Profil normal)
+                        <div>
+                            <h2 style={{ color: 'var(--orange-primary)' }}>Profil de {utilisateurConnecte.Nom}</h2>
+                            <p style={{ color: 'var(--text-muted)' }}>{utilisateurConnecte.Email}</p>
+                            <p style={{ color: 'var(--text-muted)' }}>Rôle : {utilisateurConnecte.Role}</p>
+                            
+                            {message && <p style={{ fontWeight: 'bold', color: '#28a745' }}>{message}</p>}
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1.5rem' }}>
+                                <button className="btn-primary" onClick={lancerEdition}>Paramètres du compte</button>
+                                <button 
+                                    className="btn-primary" 
+                                    style={{ backgroundColor: '#333' }}
+                                    onClick={() => { setUtilisateurConnecte(null); setOngletActif('accueil'); }}
+                                >
+                                    Se déconnecter
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        // VUE ÉDITION (Formulaire)
+                        <form onSubmit={handleSauvegarder} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
+                            <h2 style={{ color: 'var(--orange-primary)', textAlign: 'center', marginTop: 0 }}>Modifier mes informations</h2>
+                            
+                            <div>
+                                <label style={{ color: 'var(--text-muted)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>Nom d'athlète</label>
+                                <input type="text" value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} required />
+                            </div>
+                            
+                            <div>
+                                <label style={{ color: 'var(--text-muted)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>Adresse Email</label>
+                                <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required />
+                            </div>
+                            
+                            <div>
+                                <label style={{ color: 'var(--text-muted)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>Nouveau mot de passe <small>(laisser vide pour conserver l'actuel)</small></label>
+                                <input type="password" placeholder="***" value={formData.motDePasse} onChange={e => setFormData({...formData, motDePasse: e.target.value})} />
+                            </div>
+                            
+                            <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                                <button type="button" className="btn-primary" style={{ flex: 1, backgroundColor: '#333' }} onClick={() => setModeEdition(false)}>Annuler</button>
+                                <button type="submit" className="btn-primary" style={{ flex: 1, backgroundColor: '#28a745' }}>Enregistrer</button>
+                            </div>
+                        </form>
+                    )}
+                </div>
+            );
+        }
+
+        // --- COMPOSANT PLACEHOLDER ÉVÉNEMENTS (Tout à gauche) ---
+        // --- COMPOSANT ÉVÉNEMENTS (Connecté à la BDD) ---
+        function Evenements({ utilisateurConnecte }) {
+            const [listeEvenements, setListeEvenements] = React.useState([]);
+            const [chargement, setChargement] = React.useState(true);
+
+            const chargerEvenements = () => {
+                fetch("../Backend/get_evenements.php")
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.erreur) console.error(data.erreur);
+                        else setListeEvenements(data);
+                        setChargement(false);
+                    })
+                    .catch(err => { console.error(err); setChargement(false); });
+            };
+
+            React.useEffect(() => { chargerEvenements(); }, []);
+
+            const handleParticiper = (id) => {
+                if (!utilisateurConnecte) {
+                    alert("Vous devez vous connecter pour participer à un événement.");
+                    return;
+                }
+
+                fetch("../Backend/participer_evenement.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ evenement_id: id, utilisateur_id: utilisateurConnecte.ID })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.erreur) alert("❌ " + data.erreur);
+                    else if (data.info) alert("ℹ️ " + data.info);
+                    else {
+                        alert("✅ " + data.succes);
+                        chargerEvenements(); // Rafraîchit le nombre de participants
+                    }
+                });
+            };
+
+            return (
+                <div>
+                    <div className="card" style={{ marginBottom: '2rem' }}>
+                        <h2 style={{ color: 'var(--orange-primary)', marginTop: 0 }}>Calendrier Sportif</h2>
+                        <p style={{ color: 'var(--text-muted)' }}>Découvrez les sessions collectives et compétitions à venir.</p>
+                        <button className="btn-primary" style={{ width: '100%' }} onClick={() => alert("Création d'événement bientôt disponible !")}>
+                            + Organiser un événement
+                        </button>
+                    </div>
+
+                    {chargement ? (
+                        <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Recherche des événements...</p>
+                    ) : listeEvenements.length === 0 ? (
+                        <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucun événement prévu pour le moment.</p>
+                    ) : (
+                        listeEvenements.map(evt => (
+                            <div key={evt.ID} className="card" style={{ borderLeft: '4px solid #28a745' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{evt.Titre}</h3>
+                                </div>
+                                
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginBottom: '1rem', fontSize: '0.9rem', color: 'var(--text-light)' }}>
+                                    <span>📅 <strong>{evt.Date_Formatee}</strong></span>
+                                    <span>📍 {evt.Lieu}</span>
+                                    <span style={{ color: 'var(--text-muted)' }}>👤 Organisé par {evt.Createur}</span>
+                                </div>
+                                
+                                <p style={{ lineHeight: '1.4', marginBottom: '1.5rem', fontSize: '0.95rem' }}>
+                                    {evt.Description}
+                                </p>
+                                
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <button 
+                                        onClick={() => handleParticiper(evt.ID)}
+                                        style={{ flex: 1, backgroundColor: 'transparent', color: '#28a745', border: '1px solid #28a745', padding: '0.6rem', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold' }}
+                                    >
+                                        Je participe
+                                    </button>
+                                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                        🏃 {evt.NbParticipants} inscrits
+                                    </span>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            );
+        }
+        // --- COMPOSANT RECHERCHE (Connecté à la BDD) ---
+        function Recherche({ utilisateurConnecte }) {
+            const [requete, setRequete] = React.useState("");
+            const [ongletActif, setOngletActif] = React.useState("publications");
+            const [resultats, setResultats] = React.useState([]);
+            const [chargement, setChargement] = React.useState(false);
+
+            // Liste de nos sous-onglets
+            const onglets = [
+                { id: 'publications', label: 'Publications' },
+                { id: 'utilisateurs', label: 'Athlètes' },
+                { id: 'communautes', label: 'Communautés' },
+                { id: 'evenements', label: 'Événements' },
+                { id: 'sports', label: 'Sports' }
+            ];
+
+            // Lance la recherche à chaque fois que la requête OU l'onglet change
+            React.useEffect(() => {
+                if (requete.trim() === "") {
+                    setResultats([]); // On vide si la barre est vide
+                    return;
+                }
+
+                // Simulation pour les tables non existantes
+                if (ongletActif === 'evenements' || ongletActif === 'sports') {
+                    setResultats([{ mock: true, message: `Bientôt : Recherche de ${ongletActif} liés à "${requete}"` }]);
+                    return;
+                }
+
+                setChargement(true);
+                fetch("../Backend/rechercher.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ requete: requete, type: ongletActif })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    setResultats(data);
+                    setChargement(false);
+                })
+                .catch(err => { console.error(err); setChargement(false); });
+
+            }, [requete, ongletActif]);
+
+            return (
+                <div>
+                    <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
+                        {/* Barre de recherche */}
+                        <div style={{ position: 'relative' }}>
+                            <span style={{ position: 'absolute', left: '15px', top: '15px', fontSize: '1.2rem' }}>🔍</span>
+                            <input 
+                                type="text" 
+                                placeholder={`Rechercher dans ${onglets.find(o => o.id === ongletActif).label}...`}
+                                value={requete}
+                                onChange={(e) => setRequete(e.target.value)}
+                                style={{ width: '100%', padding: '1rem 1rem 1rem 3rem', borderRadius: '25px', backgroundColor: '#111', border: '1px solid var(--border-color)', color: 'white' }} 
+                            />
+                        </div>
+
+                        {/* Sous-onglets de recherche horizontaux */}
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+                            {onglets.map(onglet => (
+                                <button 
+                                    key={onglet.id}
+                                    onClick={() => setOngletActif(onglet.id)}
+                                    style={{
+                                        backgroundColor: ongletActif === onglet.id ? 'var(--orange-primary)' : 'transparent',
+                                        color: ongletActif === onglet.id ? 'white' : 'var(--text-muted)',
+                                        border: `1px solid ${ongletActif === onglet.id ? 'var(--orange-primary)' : 'var(--border-color)'}`,
+                                        padding: '0.4rem 1rem',
+                                        borderRadius: '20px',
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                        fontWeight: ongletActif === onglet.id ? 'bold' : 'normal'
+                                    }}
+                                >
+                                    {onglet.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Zone d'affichage des résultats */}
+                    <div>
+                        {requete === "" ? (
+                            <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '2rem' }}>Tapez un mot clé pour lancer la recherche.</p>
+                        ) : chargement ? (
+                            <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Recherche en cours...</p>
+                        ) : resultats.length === 0 ? (
+                            <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucun résultat trouvé pour "{requete}".</p>
+                        ) : (
+                            resultats.map((res, index) => (
+                                <div key={res.ID || index} className="card" style={{ padding: '1rem', marginBottom: '0.5rem' }}>
+                                    
+                                    {/* Affichage adapté selon le type de résultat */}
+                                    {res.mock ? (
+                                        <p style={{ color: 'var(--orange-primary)', textAlign: 'center', margin: 0 }}>{res.message}</p>
+                                    ) : ongletActif === 'publications' ? (
+                                        <div>
+                                            <div className="post-author" style={{ fontSize: '0.9rem' }}>{res.Nom}</div>
+                                            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>{res.Contenu}</p>
+                                        </div>
+                                    ) : ongletActif === 'utilisateurs' ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                            <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '40px', height: '40px' }}>
+                                                {res.Nom.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <div style={{ fontWeight: 'bold' }}>{res.Nom}</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{res.Role}</div>
+                                            </div>
+                                        </div>
+                                    ) : ongletActif === 'communautes' ? (
+                                        <div>
+                                            <div style={{ fontWeight: 'bold', color: 'var(--orange-primary)' }}>{res.Nom}</div>
+                                            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{res.Description}</p>
+                                        </div>
+                                    ) : null}
+
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            );
+        } 
+        // --- COMPOSANT COMMUNAUTÉS (Connecté à la BDD avec création) ---
         function Communautes({ utilisateurConnecte }) {
             const [listeCommunautes, setListeCommunautes] = React.useState([]);
             const [chargement, setChargement] = React.useState(true);
+            
+            // États pour gérer le formulaire de création
+            const [afficherFormulaire, setAfficherFormulaire] = React.useState(false);
+            const [nouveauGroupe, setNouveauGroupe] = React.useState({ nom: '', description: '' });
 
-            // Charger les communautés depuis PHP
-            React.useEffect(() => {
+            const chargerCommunautes = () => {
                 fetch("../Backend/get_communautes.php")
                     .then(response => response.json())
                     .then(data => {
@@ -165,19 +477,63 @@
                         else setListeCommunautes(data);
                         setChargement(false);
                     })
-                    .catch(error => {
-                        console.error("Erreur:", error);
-                        setChargement(false);
-                    });
-            }, []);
+                    .catch(error => { console.error("Erreur:", error); setChargement(false); });
+            };
+
+            React.useEffect(() => { chargerCommunautes(); }, []);
 
             const handleRejoindre = (id) => {
                 if (!utilisateurConnecte) {
-                    alert("Vous devez vous connecter pour rejoindre un groupe d'entraînement.");
+                    alert("Vous devez vous connecter pour rejoindre un groupe.");
                     return;
                 }
-                // Pour l'instant, c'est une simple alerte. Nous pourrons coder l'insertion PHP plus tard !
-                alert("Fonctionnalité 'Rejoindre' en cours de développement !");
+                const dataJoin = { communaute_id: id, utilisateur_id: utilisateurConnecte.ID };
+
+                fetch("../Backend/rejoindre_communaute.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(dataJoin)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.erreur) alert("❌ " + data.erreur);
+                    else if (data.info) alert("ℹ️ " + data.info);
+                    else {
+                        alert("✅ " + data.succes);
+                        chargerCommunautes(); // Rafraîchit le nombre de membres
+                    }
+                });
+            };
+
+            const handleCreer = (e) => {
+                e.preventDefault();
+                if (!utilisateurConnecte) {
+                    alert("Vous devez vous connecter pour créer un groupe.");
+                    return;
+                }
+
+                const postData = {
+                    nom: nouveauGroupe.nom,
+                    description: nouveauGroupe.description,
+                    createur_id: utilisateurConnecte.ID
+                };
+
+                fetch("../Backend/creer_communaute.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(postData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.erreur) {
+                        alert("❌ " + data.erreur);
+                    } else {
+                        alert("✅ " + data.succes);
+                        setNouveauGroupe({ nom: '', description: '' }); // Vide le formulaire
+                        setAfficherFormulaire(false); // Masque le formulaire
+                        chargerCommunautes(); // Met à jour la liste des groupes
+                    }
+                });
             };
 
             return (
@@ -186,10 +542,37 @@
                         <h2 style={{ color: 'var(--orange-primary)', marginTop: 0 }}>Groupes d'entraînement</h2>
                         <p style={{ color: 'var(--text-muted)' }}>Trouvez des partenaires et partagez vos routines spécifiques.</p>
                         
-                        {/* Bouton pour créer une communauté (visuel pour l'instant) */}
-                        <button className="btn-primary" style={{ width: '100%' }} onClick={() => alert("Bientôt possible !")}>
-                            + Créer une nouvelle communauté
+                        {/* Bouton pour afficher/masquer le formulaire */}
+                        <button 
+                            className="btn-primary" 
+                            style={{ width: '100%', marginBottom: afficherFormulaire ? '1rem' : '0' }} 
+                            onClick={() => {
+                                if(!utilisateurConnecte) alert("Veuillez vous connecter d'abord.");
+                                else setAfficherFormulaire(!afficherFormulaire);
+                            }}
+                        >
+                            {afficherFormulaire ? "Annuler" : "+ Créer une nouvelle communauté"}
                         </button>
+
+                        {/* Formulaire de création (visible uniquement si afficherFormulaire est true) */}
+                        {afficherFormulaire && (
+                            <form onSubmit={handleCreer} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                                <input 
+                                    type="text" 
+                                    placeholder="Nom du groupe (ex: Natation Paris)" 
+                                    value={nouveauGroupe.nom} 
+                                    onChange={(e) => setNouveauGroupe({...nouveauGroupe, nom: e.target.value})} 
+                                    required 
+                                />
+                                <textarea 
+                                    placeholder="Description de votre groupe et des objectifs..." 
+                                    value={nouveauGroupe.description} 
+                                    onChange={(e) => setNouveauGroupe({...nouveauGroupe, description: e.target.value})} 
+                                    rows="3"
+                                />
+                                <button type="submit" className="btn-primary" style={{ backgroundColor: '#28a745' }}>Valider la création</button>
+                            </form>
+                        )}
                     </div>
 
                     {chargement ? (
@@ -206,23 +589,14 @@
                                     </span>
                                 </div>
                                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                                    Créé par {communaute.Createur}
+                                    Créé par <strong style={{ color: 'white' }}>{communaute.Createur}</strong>
                                 </p>
                                 <p style={{ lineHeight: '1.4', marginBottom: '1.5rem' }}>
                                     {communaute.Description}
                                 </p>
                                 <button 
                                     onClick={() => handleRejoindre(communaute.ID)}
-                                    style={{ 
-                                        backgroundColor: 'transparent', 
-                                        color: 'var(--orange-primary)', 
-                                        border: '1px solid var(--orange-primary)', 
-                                        padding: '0.5rem 1rem', 
-                                        borderRadius: '20px', 
-                                        cursor: 'pointer',
-                                        width: '100%',
-                                        fontWeight: 'bold'
-                                    }}
+                                    style={{ backgroundColor: 'transparent', color: 'var(--orange-primary)', border: '1px solid var(--orange-primary)', padding: '0.5rem 1rem', borderRadius: '20px', cursor: 'pointer', width: '100%', fontWeight: 'bold' }}
                                 >
                                     Rejoindre le groupe
                                 </button>
@@ -232,13 +606,172 @@
                 </div>
             );
         }
+        // --- COMPOSANT MESSAGERIE PRIVÉE (Version complète avec correction du défilement) ---
+        function Messages({ utilisateurConnecte }) {
+            const [listeContacts, setListeContacts] = React.useState([]);
+            const [contactSelectionne, setContactSelectionne] = React.useState(null);
+            const [historiqueMessages, setHistoriqueMessages] = React.useState([]);
+            const [nouveauMessage, setNouveauMessage] = React.useState("");
 
-        // --- COMPOSANT PLACEHOLDER MESSAGES ---
-        function Messages() {
+            // Référence pour le défilement automatique
+            const finDesMessagesRef = React.useRef(null);
+
+            // Actionneur du défilement vers le bas
+            const scrollerVersLeBas = () => {
+                finDesMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
+            };
+
+            // Surveillance des changements d'historique pour repositionner le scroll
+            React.useEffect(() => {
+                scrollerVersLeBas();
+            }, [historiqueMessages]);
+
+            // Récupération de la liste des contacts au chargement
+            React.useEffect(() => {
+                fetch("../Backend/get_utilisateurs.php")
+                    .then(res => res.json())
+                    .then(data => {
+                        if (!data.erreur) {
+                            const autresUtilisateurs = utilisateurConnecte 
+                                ? data.filter(u => u.ID != utilisateurConnecte.ID) 
+                                : data;
+                            setListeContacts(autresUtilisateurs);
+                        }
+                    })
+                    .catch(err => console.error("Erreur de communication avec get_utilisateurs.php :", err));
+            }, [utilisateurConnecte]);
+
+            // Chargement de l'historique des messages d'une discussion
+            const chargerConversation = (contact) => {
+                setContactSelectionne(contact);
+                fetch("../Backend/get_messages.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ user1: utilisateurConnecte.ID, user2: contact.ID })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.erreur) setHistoriqueMessages(data);
+                });
+            };
+
+            // Envoi d'un nouveau message privé
+            const handleEnvoyer = (e) => {
+                e.preventDefault();
+                if (nouveauMessage.trim() === "") return;
+
+                const postData = {
+                    expediteur_id: utilisateurConnecte.ID,
+                    destinataire_id: contactSelectionne.ID,
+                    contenu: nouveauMessage
+                };
+
+                fetch("../Backend/envoyer_message.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(postData)
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.erreur) {
+                        setNouveauMessage("");
+                        chargerConversation(contactSelectionne); // Rafraîchit l'historique
+                    }
+                });
+            };
+
+            if (!utilisateurConnecte) {
+                return (
+                    <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+                        <h2 style={{ color: 'var(--orange-primary)' }}>Messagerie</h2>
+                        <p style={{ color: 'var(--text-muted)' }}>Veuillez vous connecter pour discuter avec d'autres athlètes.</p>
+                    </div>
+                );
+            }
+
             return (
-                <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem' }}>
-                    <h2 style={{ color: 'var(--orange-primary)' }}>Messagerie</h2>
-                    <p>Discutez de vos objectifs avec d'autres athlètes. Bientôt disponible !</p>
+                <div>
+                    {!contactSelectionne ? (
+                        // VUE 1 : Liste complète des contacts
+                        <div className="card">
+                            <h2 style={{ color: 'var(--orange-primary)', marginTop: 0 }}>Vos Contacts</h2>
+                            <p style={{ color: 'var(--text-muted)' }}>Sélectionnez un athlète pour démarrer la discussion.</p>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {listeContacts.map(contact => (
+                                    <div 
+                                        key={contact.ID} 
+                                        onClick={() => chargerConversation(contact)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', backgroundColor: '#111', borderRadius: '8px', cursor: 'pointer', border: '1px solid var(--border-color)' }}
+                                    >
+                                        <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '40px', height: '40px' }}>
+                                            {contact.Nom.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div style={{ fontWeight: 'bold' }}>{contact.Nom}</div>
+                                    </div>
+                                ))}
+                                {listeContacts.length === 0 && <p style={{ textAlign: 'center' }}>Aucun autre utilisateur enregistré.</p>}
+                            </div>
+                        </div>
+                    ) : (
+                        // VUE 2 : Fenêtre de discussion active
+                        <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '60vh' }}>
+                            {/* En-tête de la discussion */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>
+                                <button 
+                                    onClick={() => setContactSelectionne(null)} 
+                                    style={{ backgroundColor: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }}
+                                >
+                                    ⬅️
+                                </button>
+                                <h3 style={{ margin: 0, color: 'var(--orange-primary)' }}>{contactSelectionne.Nom}</h3>
+                            </div>
+
+                            {/* Zone scrollable contenant les messages */}
+                            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem', paddingRight: '0.5rem' }}>
+                                {historiqueMessages.length === 0 ? (
+                                    <p style={{ textAlign: 'center', color: 'var(--text-muted)', paddingTop: '2rem' }}>Dites bonjour à {contactSelectionne.Nom} !</p>
+                                ) : (
+                                    historiqueMessages.map(msg => {
+                                        const estMoi = msg.Expediteur_ID === utilisateurConnecte.ID;
+                                        return (
+                                            <div key={msg.ID} style={{ display: 'flex', justifyContent: estMoi ? 'flex-end' : 'flex-start', marginBottom: '0.5rem' }}>
+                                                <div style={{ 
+                                                    backgroundColor: estMoi ? 'var(--orange-primary)' : '#333', 
+                                                    color: 'white', 
+                                                    padding: '0.8rem 1rem', 
+                                                    borderRadius: '20px', 
+                                                    borderBottomRightRadius: estMoi ? '0' : '20px',
+                                                    borderBottomLeftRadius: estMoi ? '20px' : '0',
+                                                    maxWidth: '75%',
+                                                    lineHeight: '1.4'
+                                                }}>
+                                                    {msg.Contenu}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                                {/* Repère de fin invisible pour le scroll ciblé */}
+                                <div ref={finDesMessagesRef} />
+                            </div>
+
+                            {/* Formulaire de saisie et d'envoi */}
+                            <form onSubmit={handleEnvoyer} style={{ display: 'flex', gap: '0.5rem' }}>
+                                <input 
+                                    type="text" 
+                                    placeholder="Écrivez un message..." 
+                                    value={nouveauMessage} 
+                                    onChange={(e) => setNouveauMessage(e.target.value)} 
+                                    style={{ flex: 1, padding: '0.8rem', borderRadius: '25px', backgroundColor: '#111', border: '1px solid var(--border-color)', color: 'white' }}
+                                    required
+                                />
+                                <button type="submit" className="btn-primary" style={{ borderRadius: '50%', width: '45px', height: '45px', padding: '0', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                    ➤
+                                </button>
+                            </form>
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -303,11 +836,20 @@
 
         // --- COMPOSANT FIL D'ACTUALITÉ ---
         // Il reçoit désormais "utilisateurConnecte" en paramètre (les props)
+        // --- COMPOSANT FIL D'ACTUALITÉ ---
+        // --- COMPOSANT FIL D'ACTUALITÉ (Texte, Médias & Commentaires connectés) ---
         function FilActualite({ utilisateurConnecte }) {
             const [nouveauMessage, setNouveauMessage] = React.useState("");
+            const [fichierMedia, setFichierMedia] = React.useState(null);
             const [publications, setPublications] = React.useState([]);
             const [chargement, setChargement] = React.useState(true);
+            
+            // États pour la gestion des commentaires
+            const [commentairesOuverts, setCommentairesOuverts] = React.useState(null);
+            const [texteCommentaire, setTexteCommentaire] = React.useState("");
+            const [listeCommentaires, setListeCommentaires] = React.useState([]);
 
+            // 1. Charger l'ensemble des publications depuis le serveur
             const chargerPublications = () => {
                 fetch("../Backend/get_publications.php")
                     .then(response => response.json())
@@ -321,39 +863,46 @@
 
             React.useEffect(() => { chargerPublications(); }, []);
 
+            // 2. Publier un nouveau post (Texte et/ou Média)
             const handlePublier = (e) => {
                 e.preventDefault();
-                
-                // On vérifie d'abord si l'utilisateur est bien connecté !
                 if (!utilisateurConnecte) {
                     alert("Vous devez vous connecter pour partager vos performances.");
                     return;
                 }
 
-                // On utilise le véritable ID de la personne connectée
-                const postData = { contenu: nouveauMessage, auteur_id: utilisateurConnecte.ID };
+                // Utilisation de FormData pour permettre l'envoi de fichiers
+                const formData = new FormData();
+                formData.append('contenu', nouveauMessage);
+                formData.append('auteur_id', utilisateurConnecte.ID);
+                if (fichierMedia) {
+                    formData.append('media', fichierMedia);
+                }
 
                 fetch("../Backend/ajouter_publication.php", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(postData)
+                    body: formData // Le navigateur configure automatiquement le Content-Type approprié
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.erreur) alert(data.erreur);
-                    else {
+                    if (data.erreur) {
+                        alert("❌ " + data.erreur);
+                    } else {
                         setNouveauMessage(""); 
-                        chargerPublications(); 
+                        setFichierMedia(null);
+                        document.getElementById("input-fichier").value = ""; // Réinitialise le champ d'upload
+                        chargerPublications(); // Rafraîchit instantanément le fil d'actualité
                     }
-                });
+                })
+                .catch(err => console.error("Erreur lors de la publication :", err));
             };
 
+            // 3. Gérer les mentions "Respect" (Likes)
             const gererLike = (publicationId) => {
                 if (!utilisateurConnecte) {
                     alert("Vous devez vous connecter pour soutenir un athlète.");
                     return;
                 }
-
                 const dataLike = { publication_id: publicationId, utilisateur_id: utilisateurConnecte.ID };
                 
                 fetch("../Backend/liker_publication.php", {
@@ -361,15 +910,60 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(dataLike)
                 })
-                .then(response => response.json())
+                .then(res => res.json())
+                .then(data => { 
+                    if (!data.erreur) chargerPublications(); 
+                });
+            };
+
+            // 4. Charger et afficher/masquer la section des commentaires
+            const basculerCommentaires = (pubId) => {
+                if (commentairesOuverts === pubId) {
+                    setCommentairesOuverts(null);
+                } else {
+                    setCommentairesOuverts(pubId);
+                    setListeCommentaires([]);
+                    
+                    fetch(`../Backend/get_commentaires.php?pub_id=${pubId}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (!data.erreur) setListeCommentaires(data);
+                        });
+                }
+            };
+
+            // 5. Envoyer un nouveau commentaire en base de données
+            const envoyerCommentaire = (e, pubId) => {
+                e.preventDefault();
+                if (!utilisateurConnecte) return alert("Connectez-vous pour commenter.");
+                if (texteCommentaire.trim() === "") return;
+                
+                const dataComment = {
+                    publication_id: pubId,
+                    auteur_id: utilisateurConnecte.ID,
+                    contenu: texteCommentaire
+                };
+
+                fetch("../Backend/ajouter_commentaire.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(dataComment)
+                })
+                .then(res => res.json())
                 .then(data => {
-                    if (data.erreur) console.error(data.erreur);
-                    else chargerPublications(); 
+                    if (!data.erreur) {
+                        setTexteCommentaire(""); 
+                        // Recharge immédiatement les commentaires de cette publication
+                        fetch(`../Backend/get_commentaires.php?pub_id=${pubId}`)
+                            .then(res => res.json())
+                            .then(nouvellesData => setListeCommentaires(nouvellesData));
+                    }
                 });
             };
 
             return (
                 <div>
+                    {/* Zone de création de publication */}
                     <div className="card">
                         <form onSubmit={handlePublier} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             <textarea 
@@ -377,17 +971,28 @@
                                 onChange={(e) => setNouveauMessage(e.target.value)}
                                 placeholder="Partagez vos performances, vos photos ou vos objectifs..."
                                 rows="3"
-                                required
+                                required={!fichierMedia} // Le texte n'est plus obligatoire si on charge une photo/vidéo
                             />
-                            <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-end' }}>Partager</button>
+                            
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <input 
+                                    id="input-fichier"
+                                    type="file" 
+                                    accept="image/*,video/*"
+                                    onChange={(e) => setFichierMedia(e.target.files[0])}
+                                    style={{ padding: '0', backgroundColor: 'transparent', border: 'none', width: 'auto' }}
+                                />
+                                <button type="submit" className="btn-primary">Partager</button>
+                            </div>
                         </form>
                     </div>
 
+                    {/* Liste dynamique des publications */}
                     <div className="card">
                         {chargement ? (
                             <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Chargement des performances...</p>
                         ) : publications.length === 0 ? (
-                            <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucune publication. Soyez le premier à partager votre entraînement !</p>
+                            <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucune publication pour le moment.</p>
                         ) : (
                             publications.map(pub => (
                                 <div key={pub.ID} className="post">
@@ -395,16 +1000,59 @@
                                         <span className="post-author">{pub.Nom}</span>
                                         <span className="post-date">{pub.Date_Publication}</span>
                                     </div>
-                                    <p style={{ margin: '0 0 1rem 0', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{pub.Contenu}</p>
+                                    {pub.Contenu && <p style={{ margin: '0 0 1rem 0', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{pub.Contenu}</p>}
                                     
-                                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                    {/* Affichage adaptatif si un média est présent */}
+                                    {pub.Media_URL && (
+                                        <div style={{ marginBottom: '1rem', textAlign: 'center', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden' }}>
+                                            {pub.Media_URL.match(/\.(mp4|webm)$/i) ? (
+                                                <video controls style={{ maxWidth: '100%', maxHeight: '400px', display: 'block', margin: '0 auto' }}>
+                                                    <source src={`../Backend/${pub.Media_URL}`} type={`video/${pub.Media_URL.split('.').pop()}`} />
+                                                    Votre navigateur ne supporte pas la lecture de vidéos.
+                                                </video>
+                                            ) : (
+                                                <img src={`../Backend/${pub.Media_URL}`} alt="Performance" style={{ maxWidth: '100%', maxHeight: '400px', objectFit: 'contain' }} />
+                                            )}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Barre de boutons d'interaction */}
+                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
                                         <button className="btn-like" onClick={() => gererLike(pub.ID)}>
-                                            🔥 Respect
+                                            🔥 Respect {pub.NbLikes > 0 && `(${pub.NbLikes})`}
                                         </button>
-                                        <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                                            {pub.NbLikes || 0} soutiens
-                                        </span>
+                                        <button className="btn-like" onClick={() => basculerCommentaires(pub.ID)}>💬 Commenter</button>
+                                        <button className="btn-like" onClick={() => alert("🔄 Partagé sur votre profil !")}>🔄 Republier</button>
+                                        <button className="btn-like" onClick={() => alert("🔗 Lien copié dans le presse-papier !")}>📤 Partager</button>
                                     </div>
+
+                                    {/* Section des commentaires déroulants */}
+                                    {commentairesOuverts === pub.ID && (
+                                        <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#111', borderRadius: '8px' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: '1rem' }}>
+                                                {listeCommentaires.length === 0 ? (
+                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Soyez le premier à réagir !</span>
+                                                ) : (
+                                                    listeCommentaires.map(c => (
+                                                        <div key={c.ID} style={{ fontSize: '0.9rem' }}>
+                                                            <strong style={{ color: 'var(--orange-primary)' }}>{c.Nom}</strong> : {c.Contenu}
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                            <form onSubmit={(e) => envoyerCommentaire(e, pub.ID)} style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Écrivez une réponse..." 
+                                                    value={texteCommentaire} 
+                                                    onChange={(e) => setTexteCommentaire(e.target.value)} 
+                                                    style={{ flex: 1, padding: '0.6rem', borderRadius: '20px', backgroundColor: 'var(--bg-dark)' }}
+                                                    required
+                                                />
+                                                <button type="submit" className="btn-primary" style={{ padding: '0.6rem 1.2rem' }}>Envoyer</button>
+                                            </form>
+                                        </div>
+                                    )}
                                 </div>
                             ))
                         )}
@@ -448,46 +1096,52 @@
                         {/* Gestion de l'affichage de l'onglet de profil / connexion */}
                         {ongletActif === 'profil' && (
                             utilisateurConnecte ? (
-                                <div className="card" style={{ textAlign: 'center' }}>
-                                    <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🏅</div>
-                                    <h2 style={{ color: 'var(--orange-primary)' }}>Profil de {utilisateurConnecte.Nom}</h2>
-                                    <p style={{ color: 'var(--text-muted)' }}>{utilisateurConnecte.Email}</p>
-                                    <p style={{ color: 'var(--text-muted)' }}>Rôle : {utilisateurConnecte.Role}</p>
-                                    <button 
-                                        className="btn-primary" 
-                                        style={{ marginTop: '1.5rem', backgroundColor: '#333' }}
-                                        onClick={() => { setUtilisateurConnecte(null); setOngletActif('accueil'); }}
-                                    >
-                                        Se déconnecter
-                                    </button>
-                                </div>
+                                <Profil 
+                                    utilisateurConnecte={utilisateurConnecte} 
+                                    setUtilisateurConnecte={setUtilisateurConnecte}
+                                    setOngletActif={setOngletActif}
+                                />
                             ) : (
                                 <Authentification onConnect={(user) => { 
                                     setUtilisateurConnecte(user); 
-                                    setOngletActif('accueil'); // Retour au fil d'actualité après la connexion
+                                    setOngletActif('accueil'); 
                                 }} />
                             )
                         )}
 
-                        {ongletActif === 'communautes' && <Communautes />}
+                        {/* Affichage des 5 onglets principaux */}
+                        {ongletActif === 'evenements' && <Evenements />}
+                        {ongletActif === 'communautes' && <Communautes utilisateurConnecte={utilisateurConnecte} />}
                         {ongletActif === 'accueil' && <FilActualite utilisateurConnecte={utilisateurConnecte} />}
-                        {ongletActif === 'messages' && <Messages />}
+                        {ongletActif === 'messages' && <Messages utilisateurConnecte={utilisateurConnecte} />}
+                        {ongletActif === 'recherche' && <Recherche utilisateurConnecte={utilisateurConnecte} />}
                     </main>
 
+                    {/* NAVIGATION FIXE BAS - 5 Onglets */}
                     <nav className="bottom-nav">
+                        <div className={`nav-item ${ongletActif === 'evenements' ? 'active' : ''}`} onClick={() => setOngletActif('evenements')}>
+                            <span className="nav-icon">📅</span>
+                            <span style={{ fontSize: '0.7rem' }}>Événements</span>
+                        </div>
+
                         <div className={`nav-item ${ongletActif === 'communautes' ? 'active' : ''}`} onClick={() => setOngletActif('communautes')}>
                             <span className="nav-icon">👥</span>
-                            <span>Communautés</span>
+                            <span style={{ fontSize: '0.7rem' }}>Groupes</span>
                         </div>
                         
                         <div className={`nav-item ${ongletActif === 'accueil' ? 'active' : ''}`} onClick={() => setOngletActif('accueil')}>
-                            <span className="nav-icon" style={{ fontSize: '1.8rem', color: ongletActif === 'accueil' ? 'var(--orange-primary)' : 'inherit' }}>🏠</span>
-                            <span>Accueil</span>
+                            <span className="nav-icon" style={{ fontSize: '1.6rem', color: ongletActif === 'accueil' ? 'var(--orange-primary)' : 'inherit' }}>🏠</span>
+                            <span style={{ fontSize: '0.7rem' }}>Accueil</span>
                         </div>
                         
                         <div className={`nav-item ${ongletActif === 'messages' ? 'active' : ''}`} onClick={() => setOngletActif('messages')}>
                             <span className="nav-icon">💬</span>
-                            <span>Messages</span>
+                            <span style={{ fontSize: '0.7rem' }}>Messages</span>
+                        </div>
+
+                        <div className={`nav-item ${ongletActif === 'recherche' ? 'active' : ''}`} onClick={() => setOngletActif('recherche')}>
+                            <span className="nav-icon">🔍</span>
+                            <span style={{ fontSize: '0.7rem' }}>Recherche</span>
                         </div>
                     </nav>
                 </div>
