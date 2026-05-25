@@ -335,7 +335,7 @@
             );
         }
         // --- COMPOSANT RECHERCHE (Connecté à la BDD) ---
-        function Recherche({ utilisateurConnecte }) {
+        function Recherche({ utilisateurConnecte, ouvrirProfil }) {
             const [requete, setRequete] = React.useState("");
             const [ongletActif, setOngletActif] = React.useState("publications");
             const [resultats, setResultats] = React.useState([]);
@@ -433,11 +433,20 @@
                                         <p style={{ color: 'var(--orange-primary)', textAlign: 'center', margin: 0 }}>{res.message}</p>
                                     ) : ongletActif === 'publications' ? (
                                         <div>
-                                            <div className="post-author" style={{ fontSize: '0.9rem' }}>{res.Nom}</div>
+                                            <div 
+                                                className="post-author" 
+                                                style={{ fontSize: '0.9rem', cursor: 'pointer', textDecoration: 'underline' }}
+                                                onClick={() => ouvrirProfil(res.Auteur_ID)}
+                                            >
+                                                {res.Nom}
+                                            </div>
                                             <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>{res.Contenu}</p>
                                         </div>
                                     ) : ongletActif === 'utilisateurs' ? (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                        <div 
+                                            style={{ display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }}
+                                            onClick={() => ouvrirProfil(res.ID)}
+                                        >
                                             <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '40px', height: '40px' }}>
                                                 {res.Nom.charAt(0)}
                                             </div>
@@ -607,175 +616,109 @@
             );
         }
         // --- COMPOSANT MESSAGERIE PRIVÉE (Version complète avec correction du défilement) ---
-        function Messages({ utilisateurConnecte }) {
+        // --- COMPOSANT MESSAGERIE PRIVÉE (Avec Gestion des Demandes) ---
+        function Messages({ utilisateurConnecte, contactPreselectionne }) {
             const [listeContacts, setListeContacts] = React.useState([]);
             const [contactSelectionne, setContactSelectionne] = React.useState(null);
             const [historiqueMessages, setHistoriqueMessages] = React.useState([]);
             const [nouveauMessage, setNouveauMessage] = React.useState("");
-
-            // Référence pour le défilement automatique
-            const finDesMessagesRef = React.useRef(null);
-
-            // Actionneur du défilement vers le bas
-            const scrollerVersLeBas = () => {
-                finDesMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
-            };
-
-            // Surveillance des changements d'historique pour repositionner le scroll
+            const [infoStatut, setInfoStatut] = React.useState("");
             React.useEffect(() => {
-                scrollerVersLeBas();
-            }, [historiqueMessages]);
+                if (contactPreselectionne) {
+                    chargerConversation(contactPreselectionne);
+                }
+            }, [contactPreselectionne]);
 
-            // Récupération de la liste des contacts au chargement
             React.useEffect(() => {
                 fetch("../Backend/get_utilisateurs.php")
                     .then(res => res.json())
                     .then(data => {
                         if (!data.erreur) {
-                            const autresUtilisateurs = utilisateurConnecte 
-                                ? data.filter(u => u.ID != utilisateurConnecte.ID) 
-                                : data;
-                            setListeContacts(autresUtilisateurs);
+                            const autres = utilisateurConnecte ? data.filter(u => u.ID != utilisateurConnecte.ID) : data;
+                            setListeContacts(autres);
                         }
-                    })
-                    .catch(err => console.error("Erreur de communication avec get_utilisateurs.php :", err));
+                    });
             }, [utilisateurConnecte]);
 
-            // Chargement de l'historique des messages d'une discussion
             const chargerConversation = (contact) => {
                 setContactSelectionne(contact);
+                setInfoStatut("");
                 fetch("../Backend/get_messages.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ user1: utilisateurConnecte.ID, user2: contact.ID })
                 })
                 .then(res => res.json())
-                .then(data => {
-                    if (!data.erreur) setHistoriqueMessages(data);
-                });
+                .then(data => { if (!data.erreur) setHistoriqueMessages(data); });
             };
 
-            // Envoi d'un nouveau message privé
             const handleEnvoyer = (e) => {
                 e.preventDefault();
                 if (nouveauMessage.trim() === "") return;
 
-                const postData = {
-                    expediteur_id: utilisateurConnecte.ID,
-                    destinataire_id: contactSelectionne.ID,
-                    contenu: nouveauMessage
-                };
-
                 fetch("../Backend/envoyer_message.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(postData)
+                    body: JSON.stringify({ expediteur_id: utilisateurConnecte.ID, destinataire_id: contactSelectionne.ID, contenu: nouveauMessage })
                 })
                 .then(res => res.json())
                 .then(data => {
                     if (!data.erreur) {
                         setNouveauMessage("");
-                        chargerConversation(contactSelectionne); // Rafraîchit l'historique
+                        if (data.statut === 'En_Attente') {
+                            setInfoStatut("⏳ Demande envoyée ! Ce message sera accepté lorsque l'athlète vous suivra en retour.");
+                        }
+                        chargerConversation(contactSelectionne);
                     }
                 });
             };
 
-            if (!utilisateurConnecte) {
-                return (
-                    <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem' }}>
-                        <h2 style={{ color: 'var(--orange-primary)' }}>Messagerie</h2>
-                        <p style={{ color: 'var(--text-muted)' }}>Veuillez vous connecter pour discuter avec d'autres athlètes.</p>
-                    </div>
-                );
-            }
+            if (!utilisateurConnecte) return <div className="card" style={{ textAlign: 'center' }}><h2>Messagerie</h2><p>Connectez-vous pour discuter.</p></div>;
 
             return (
                 <div>
                     {!contactSelectionne ? (
-                        // VUE 1 : Liste complète des contacts
                         <div className="card">
-                            <h2 style={{ color: 'var(--orange-primary)', marginTop: 0 }}>Vos Contacts</h2>
-                            <p style={{ color: 'var(--text-muted)' }}>Sélectionnez un athlète pour démarrer la discussion.</p>
-                            
+                            <h2>Vos Contacts</h2>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {listeContacts.map(contact => (
-                                    <div 
-                                        key={contact.ID} 
-                                        onClick={() => chargerConversation(contact)}
-                                        style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', backgroundColor: '#111', borderRadius: '8px', cursor: 'pointer', border: '1px solid var(--border-color)' }}
-                                    >
-                                        <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '40px', height: '40px' }}>
-                                            {contact.Nom.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div style={{ fontWeight: 'bold' }}>{contact.Nom}</div>
+                                {listeContacts.map(c => (
+                                    <div key={c.ID} onClick={() => chargerConversation(c)} style={{ padding: '1rem', backgroundColor: '#111', borderRadius: '8px', cursor: 'pointer', border: '1px solid var(--border-color)' }}>
+                                        <strong>{c.Nom}</strong>
                                     </div>
                                 ))}
-                                {listeContacts.length === 0 && <p style={{ textAlign: 'center' }}>Aucun autre utilisateur enregistré.</p>}
                             </div>
                         </div>
                     ) : (
-                        // VUE 2 : Fenêtre de discussion active
                         <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '60vh' }}>
-                            {/* En-tête de la discussion */}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem' }}>
-                                <button 
-                                    onClick={() => setContactSelectionne(null)} 
-                                    style={{ backgroundColor: 'transparent', color: 'var(--text-muted)', border: 'none', cursor: 'pointer', fontSize: '1.5rem' }}
-                                >
-                                    ⬅️
-                                </button>
-                                <h3 style={{ margin: 0, color: 'var(--orange-primary)' }}>{contactSelectionne.Nom}</h3>
+                            <div style={{ paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1rem' }}>
+                                <button onClick={() => setContactSelectionne(null)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>⬅ Retour</button>
+                                <h3 style={{ display: 'inline', marginLeft: '1rem', color: 'var(--orange-primary)' }}>{contactSelectionne.Nom}</h3>
                             </div>
-
-                            {/* Zone scrollable contenant les messages */}
-                            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem', paddingRight: '0.5rem' }}>
-                                {historiqueMessages.length === 0 ? (
-                                    <p style={{ textAlign: 'center', color: 'var(--text-muted)', paddingTop: '2rem' }}>Dites bonjour à {contactSelectionne.Nom} !</p>
-                                ) : (
-                                    historiqueMessages.map(msg => {
-                                        const estMoi = msg.Expediteur_ID === utilisateurConnecte.ID;
-                                        return (
-                                            <div key={msg.ID} style={{ display: 'flex', justifyContent: estMoi ? 'flex-end' : 'flex-start', marginBottom: '0.5rem' }}>
-                                                <div style={{ 
-                                                    backgroundColor: estMoi ? 'var(--orange-primary)' : '#333', 
-                                                    color: 'white', 
-                                                    padding: '0.8rem 1rem', 
-                                                    borderRadius: '20px', 
-                                                    borderBottomRightRadius: estMoi ? '0' : '20px',
-                                                    borderBottomLeftRadius: estMoi ? '20px' : '0',
-                                                    maxWidth: '75%',
-                                                    lineHeight: '1.4'
-                                                }}>
-                                                    {msg.Contenu}
-                                                </div>
+                            
+                            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1rem' }}>
+                                {historiqueMessages.map(msg => {
+                                    const estMoi = msg.Expediteur_ID === utilisateurConnecte.ID;
+                                    return (
+                                        <div key={msg.ID} style={{ display: 'flex', justifyContent: estMoi ? 'flex-end' : 'flex-start', marginBottom: '0.5rem' }}>
+                                            <div style={{ backgroundColor: estMoi ? (msg.Statut === 'En_Attente' ? '#555' : 'var(--orange-primary)') : '#333', padding: '0.6rem 1rem', borderRadius: '15px' }}>
+                                                {msg.Contenu} {msg.Statut === 'En_Attente' && estMoi && <small style={{ fontSize: '0.7rem', display: 'block', color: '#aaa' }}>(Demande)</small>}
                                             </div>
-                                        );
-                                    })
-                                )}
-                                {/* Repère de fin invisible pour le scroll ciblé */}
-                                <div ref={finDesMessagesRef} />
+                                        </div>
+                                    );
+                                })}
                             </div>
 
-                            {/* Formulaire de saisie et d'envoi */}
+                            {infoStatut && <p style={{ color: 'var(--orange-primary)', fontSize: '0.85rem', margin: '0 0 0.5rem 0' }}>{infoStatut}</p>}
+
                             <form onSubmit={handleEnvoyer} style={{ display: 'flex', gap: '0.5rem' }}>
-                                <input 
-                                    type="text" 
-                                    placeholder="Écrivez un message..." 
-                                    value={nouveauMessage} 
-                                    onChange={(e) => setNouveauMessage(e.target.value)} 
-                                    style={{ flex: 1, padding: '0.8rem', borderRadius: '25px', backgroundColor: '#111', border: '1px solid var(--border-color)', color: 'white' }}
-                                    required
-                                />
-                                <button type="submit" className="btn-primary" style={{ borderRadius: '50%', width: '45px', height: '45px', padding: '0', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                                    ➤
-                                </button>
+                                <input type="text" placeholder="Écrivez votre message..." value={nouveauMessage} onChange={e => setNouveauMessage(e.target.value)} required />
+                                <button type="submit" className="btn-primary">➤</button>
                             </form>
                         </div>
                     )}
                 </div>
             );
         }
-
         // --- NOUVEAU COMPOSANT : CONNEXION / INSCRIPTION ---
         function Authentification({ onConnect }) {
             const [isLogin, setIsLogin] = React.useState(true);
@@ -838,308 +781,307 @@
         // Il reçoit désormais "utilisateurConnecte" en paramètre (les props)
         // --- COMPOSANT FIL D'ACTUALITÉ ---
         // --- COMPOSANT FIL D'ACTUALITÉ (Texte, Médias & Commentaires connectés) ---
-        function FilActualite({ utilisateurConnecte }) {
+        // --- COMPOSANT FIL D'ACTUALITÉ (Abonnements & Recommandations) ---
+        function FilActualite({ utilisateurConnecte, ouvrirProfil }) {
             const [nouveauMessage, setNouveauMessage] = React.useState("");
-            const [fichierMedia, setFichierMedia] = React.useState(null);
             const [publications, setPublications] = React.useState([]);
             const [chargement, setChargement] = React.useState(true);
-            
-            // États pour la gestion des commentaires
-            const [commentairesOuverts, setCommentairesOuverts] = React.useState(null);
-            const [texteCommentaire, setTexteCommentaire] = React.useState("");
-            const [listeCommentaires, setListeCommentaires] = React.useState([]);
+            const [fluxActif, setFluxActif] = React.useState("recommandations"); // 'recommandations' ou 'abonnes'
 
-            // 1. Charger l'ensemble des publications depuis le serveur
             const chargerPublications = () => {
-                fetch("../Backend/get_publications.php")
+                const userId = utilisateurConnecte ? utilisateurConnecte.ID : 0;
+                fetch(`../Backend/get_publications.php?user_id=${userId}&flux=${fluxActif}`)
                     .then(response => response.json())
                     .then(data => {
-                        if (data.erreur) console.error(data.erreur);
-                        else setPublications(data);
+                        if (!data.erreur) setPublications(data);
                         setChargement(false);
-                    })
-                    .catch(error => { console.error("Erreur:", error); setChargement(false); });
+                    });
             };
 
-            React.useEffect(() => { chargerPublications(); }, []);
+            React.useEffect(() => { chargerPublications(); }, [fluxActif, utilisateurConnecte]);
 
-            // 2. Publier un nouveau post (Texte et/ou Média)
+            const handleActionAbonnement = (auteurId) => {
+                if (!utilisateurConnecte) return alert("Veuillez vous connecter pour vous abonner.");
+                
+                fetch("../Backend/suivre_utilisateur.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ suiveur_id: utilisateurConnecte.ID, suivi_id: auteurId })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.erreur) chargerPublications(); // Recharge pour actualiser les boutons
+                });
+            };
+
             const handlePublier = (e) => {
                 e.preventDefault();
-                if (!utilisateurConnecte) {
-                    alert("Vous devez vous connecter pour partager vos performances.");
-                    return;
-                }
-
-                // Utilisation de FormData pour permettre l'envoi de fichiers
-                const formData = new FormData();
-                formData.append('contenu', nouveauMessage);
-                formData.append('auteur_id', utilisateurConnecte.ID);
-                if (fichierMedia) {
-                    formData.append('media', fichierMedia);
-                }
-
+                const postData = { contenu: nouveauMessage, auteur_id: utilisateurConnecte.ID };
                 fetch("../Backend/ajouter_publication.php", {
                     method: "POST",
-                    body: formData // Le navigateur configure automatiquement le Content-Type approprié
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.erreur) {
-                        alert("❌ " + data.erreur);
-                    } else {
-                        setNouveauMessage(""); 
-                        setFichierMedia(null);
-                        document.getElementById("input-fichier").value = ""; // Réinitialise le champ d'upload
-                        chargerPublications(); // Rafraîchit instantanément le fil d'actualité
-                    }
-                })
-                .catch(err => console.error("Erreur lors de la publication :", err));
-            };
-
-            // 3. Gérer les mentions "Respect" (Likes)
-            const gererLike = (publicationId) => {
-                if (!utilisateurConnecte) {
-                    alert("Vous devez vous connecter pour soutenir un athlète.");
-                    return;
-                }
-                const dataLike = { publication_id: publicationId, utilisateur_id: utilisateurConnecte.ID };
-                
-                fetch("../Backend/liker_publication.php", {
-                    method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(dataLike)
+                    body: JSON.stringify(postData)
                 })
-                .then(res => res.json())
-                .then(data => { 
-                    if (!data.erreur) chargerPublications(); 
-                });
-            };
-
-            // 4. Charger et afficher/masquer la section des commentaires
-            const basculerCommentaires = (pubId) => {
-                if (commentairesOuverts === pubId) {
-                    setCommentairesOuverts(null);
-                } else {
-                    setCommentairesOuverts(pubId);
-                    setListeCommentaires([]);
-                    
-                    fetch(`../Backend/get_commentaires.php?pub_id=${pubId}`)
-                        .then(res => res.json())
-                        .then(data => {
-                            if (!data.erreur) setListeCommentaires(data);
-                        });
-                }
-            };
-
-            // 5. Envoyer un nouveau commentaire en base de données
-            const envoyerCommentaire = (e, pubId) => {
-                e.preventDefault();
-                if (!utilisateurConnecte) return alert("Connectez-vous pour commenter.");
-                if (texteCommentaire.trim() === "") return;
-                
-                const dataComment = {
-                    publication_id: pubId,
-                    auteur_id: utilisateurConnecte.ID,
-                    contenu: texteCommentaire
-                };
-
-                fetch("../Backend/ajouter_commentaire.php", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(dataComment)
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (!data.erreur) {
-                        setTexteCommentaire(""); 
-                        // Recharge immédiatement les commentaires de cette publication
-                        fetch(`../Backend/get_commentaires.php?pub_id=${pubId}`)
-                            .then(res => res.json())
-                            .then(nouvellesData => setListeCommentaires(nouvellesData));
-                    }
-                });
+                .then(() => { setNouveauMessage(""); chargerPublications(); });
             };
 
             return (
                 <div>
-                    {/* Zone de création de publication */}
-                    <div className="card">
-                        <form onSubmit={handlePublier} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            <textarea 
-                                value={nouveauMessage}
-                                onChange={(e) => setNouveauMessage(e.target.value)}
-                                placeholder="Partagez vos performances, vos photos ou vos objectifs..."
-                                rows="3"
-                                required={!fichierMedia} // Le texte n'est plus obligatoire si on charge une photo/vidéo
-                            />
-                            
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <input 
-                                    id="input-fichier"
-                                    type="file" 
-                                    accept="image/*,video/*"
-                                    onChange={(e) => setFichierMedia(e.target.files[0])}
-                                    style={{ padding: '0', backgroundColor: 'transparent', border: 'none', width: 'auto' }}
-                                />
-                                <button type="submit" className="btn-primary">Partager</button>
-                            </div>
-                        </form>
-                    </div>
-
-                    {/* Liste dynamique des publications */}
-                    <div className="card">
-                        {chargement ? (
-                            <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Chargement des performances...</p>
-                        ) : publications.length === 0 ? (
-                            <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucune publication pour le moment.</p>
-                        ) : (
-                            publications.map(pub => (
-                                <div key={pub.ID} className="post">
-                                    <div className="post-header">
-                                        <span className="post-author">{pub.Nom}</span>
-                                        <span className="post-date">{pub.Date_Publication}</span>
-                                    </div>
-                                    {pub.Contenu && <p style={{ margin: '0 0 1rem 0', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{pub.Contenu}</p>}
-                                    
-                                    {/* Affichage adaptatif si un média est présent */}
-                                    {pub.Media_URL && (
-                                        <div style={{ marginBottom: '1rem', textAlign: 'center', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden' }}>
-                                            {pub.Media_URL.match(/\.(mp4|webm)$/i) ? (
-                                                <video controls style={{ maxWidth: '100%', maxHeight: '400px', display: 'block', margin: '0 auto' }}>
-                                                    <source src={`../Backend/${pub.Media_URL}`} type={`video/${pub.Media_URL.split('.').pop()}`} />
-                                                    Votre navigateur ne supporte pas la lecture de vidéos.
-                                                </video>
-                                            ) : (
-                                                <img src={`../Backend/${pub.Media_URL}`} alt="Performance" style={{ maxWidth: '100%', maxHeight: '400px', objectFit: 'contain' }} />
-                                            )}
-                                        </div>
-                                    )}
-                                    
-                                    {/* Barre de boutons d'interaction */}
-                                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                                        <button className="btn-like" onClick={() => gererLike(pub.ID)}>
-                                            🔥 Respect {pub.NbLikes > 0 && `(${pub.NbLikes})`}
-                                        </button>
-                                        <button className="btn-like" onClick={() => basculerCommentaires(pub.ID)}>💬 Commenter</button>
-                                        <button className="btn-like" onClick={() => alert("🔄 Partagé sur votre profil !")}>🔄 Republier</button>
-                                        <button className="btn-like" onClick={() => alert("🔗 Lien copié dans le presse-papier !")}>📤 Partager</button>
-                                    </div>
-
-                                    {/* Section des commentaires déroulants */}
-                                    {commentairesOuverts === pub.ID && (
-                                        <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#111', borderRadius: '8px' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: '1rem' }}>
-                                                {listeCommentaires.length === 0 ? (
-                                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Soyez le premier à réagir !</span>
-                                                ) : (
-                                                    listeCommentaires.map(c => (
-                                                        <div key={c.ID} style={{ fontSize: '0.9rem' }}>
-                                                            <strong style={{ color: 'var(--orange-primary)' }}>{c.Nom}</strong> : {c.Contenu}
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                            <form onSubmit={(e) => envoyerCommentaire(e, pub.ID)} style={{ display: 'flex', gap: '0.5rem' }}>
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="Écrivez une réponse..." 
-                                                    value={texteCommentaire} 
-                                                    onChange={(e) => setTexteCommentaire(e.target.value)} 
-                                                    style={{ flex: 1, padding: '0.6rem', borderRadius: '20px', backgroundColor: 'var(--bg-dark)' }}
-                                                    required
-                                                />
-                                                <button type="submit" className="btn-primary" style={{ padding: '0.6rem 1.2rem' }}>Envoyer</button>
-                                            </form>
-                                        </div>
-                                    )}
-                                </div>
-                            ))
+                    {/* Onglets supérieurs de sélection du flux */}
+                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', justifyContent: 'center' }}>
+                        <button 
+                            onClick={() => setFluxActif("recommandations")}
+                            style={{ background: 'none', border: 'none', color: fluxActif === "recommandations" ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer', fontSize: '1.1rem', borderBottom: fluxActif === "recommandations" ? '2px solid var(--orange-primary)' : 'none', paddingBottom: '0.3rem' }}
+                        >
+                            Pour vous (Recommandations)
+                        </button>
+                        {utilisateurConnecte && (
+                            <button 
+                                onClick={() => setFluxActif("abonnes")}
+                                style={{ background: 'none', border: 'none', color: fluxActif === "abonnes" ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer', fontSize: '1.1rem', borderBottom: fluxActif === "abonnes" ? '2px solid var(--orange-primary)' : 'none', paddingBottom: '0.3rem' }}
+                            >
+                                Abonnements
+                            </button>
                         )}
                     </div>
+
+                    {utilisateurConnecte && (
+                        <div className="card">
+                            <form onSubmit={handlePublier} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <textarea value={nouveauMessage} onChange={(e) => setNouveauMessage(e.target.value)} placeholder="Quoi de neuf ?" rows="2" required />
+                                <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-end' }}>Partager</button>
+                            </form>
+                        </div>
+                    )}
+
+                    <div className="card">
+                        {chargement ? <p style={{ textAlign: 'center' }}>Chargement...</p> : publications.map(pub => (
+                            <div key={pub.ID} className="post" style={{ paddingBottom: '1rem', marginBottom: '1rem' }}>
+                                <div className="post-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span className="post-author"onClick={() => ouvrirProfil(pub.Auteur_ID)} 
+                                        style={{ cursor: 'pointer', textDecoration: 'underline' }}>{pub.Nom}</span>
+                                    
+                                    {/* Bouton Suivre / Se désabonner dynamique */}
+                                    {utilisateurConnecte && utilisateurConnecte.ID !== pub.Auteur_ID && (
+                                        <button 
+                                            onClick={() => handleActionAbonnement(pub.Auteur_ID)}
+                                            style={{ backgroundColor: pub.EstAbonne ? '#333' : 'transparent', color: pub.EstAbonne ? 'white' : 'var(--orange-primary)', border: '1px solid var(--orange-primary)', borderRadius: '15px', padding: '0.2rem 0.8rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}
+                                        >
+                                            {pub.EstAbonne ? "Abonné ✓" : "+ Suivre"}
+                                        </button>
+                                    )}
+                                </div>
+                                <p style={{ marginTop: '0.5rem' }}>{pub.Contenu}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+        // --- COMPOSANT PROFIL PUBLIC (Vue d'un autre utilisateur) ---
+        function ProfilPublic({ id, visiteur, fermer, demarrerDiscussion }) {
+            const [data, setData] = React.useState(null);
+            const [chargement, setChargement] = React.useState(true);
+
+            const chargerProfil = () => {
+                fetch(`../Backend/get_profil_public.php?id=${id}&visiteur=${visiteur ? visiteur.ID : 0}`)
+                    .then(res => res.json())
+                    .then(resData => {
+                        if (!resData.erreur) setData(resData);
+                        setChargement(false);
+                    });
+            };
+
+            React.useEffect(() => { chargerProfil(); }, [id]);
+
+            const handleActionAbonnement = () => {
+                if (!visiteur) return alert("Veuillez vous connecter pour vous abonner.");
+                fetch("../Backend/suivre_utilisateur.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ suiveur_id: visiteur.ID, suivi_id: id })
+                })
+                .then(res => res.json())
+                .then(d => {
+                    if (!d.erreur) chargerProfil(); // Recharge le profil pour mettre à jour les compteurs
+                });
+            };
+
+            if (chargement) return <div className="card" style={{ textAlign: 'center' }}>Chargement du profil...</div>;
+            if (!data || !data.utilisateur) return <div className="card" style={{ textAlign: 'center' }}>Profil introuvable. <button className="btn-primary" onClick={fermer}>Retour</button></div>;
+
+            const u = data.utilisateur;
+            const pubs = data.publications;
+
+            return (
+                <div>
+                    <button onClick={fermer} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', marginBottom: '1rem', fontSize: '1rem' }}>
+                        ⬅ Retour au fil d'actualité
+                    </button>
+
+                    <div className="card" style={{ textAlign: 'center' }}>
+                        <div className="profile-pic" style={{ width: '80px', height: '80px', margin: '0 auto 1rem auto', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '2.5rem', backgroundColor: '#333' }}>
+                            {u.Nom.charAt(0).toUpperCase()}
+                        </div>
+                        <h2 style={{ color: 'var(--orange-primary)', margin: '0 0 0.5rem 0' }}>{u.Nom}</h2>
+                        <p style={{ color: 'var(--text-muted)', margin: '0 0 1.5rem 0' }}>{u.Role}</p>
+
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '2rem', marginBottom: '1.5rem' }}>
+                            <div><strong style={{ display: 'block', fontSize: '1.2rem', color: 'white' }}>{u.NbAbonnes}</strong> <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Abonnés</span></div>
+                            <div><strong style={{ display: 'block', fontSize: '1.2rem', color: 'white' }}>{u.NbAbonnements}</strong> <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Abonnements</span></div>
+                        </div>
+
+                        {visiteur && visiteur.ID !== u.ID && (
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+                                <button 
+                                    onClick={handleActionAbonnement}
+                                    className="btn-primary"
+                                    style={{ backgroundColor: u.EstAbonne ? '#333' : 'var(--orange-primary)', color: 'white', border: u.EstAbonne ? '1px solid var(--border-color)' : 'none' }}
+                                >
+                                    {u.EstAbonne ? "Abonné ✓" : "+ Suivre"}
+                                </button>
+                                <button 
+                                    onClick={() => demarrerDiscussion(u)}
+                                    className="btn-primary"
+                                    style={{ backgroundColor: 'transparent', border: '1px solid var(--orange-primary)', color: 'var(--orange-primary)' }}
+                                >
+                                    💬 Message
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Performances de {u.Nom}</h3>
+
+                    {pubs.length === 0 ? (
+                        <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucune publication pour le moment.</p>
+                    ) : (
+                        pubs.map(pub => (
+                            <div key={pub.ID} className="card post" style={{ padding: '1.5rem' }}>
+                                <div className="post-header">
+                                    <span className="post-author">{pub.Nom}</span>
+                                    <span className="post-date">{pub.Date_Publication}</span>
+                                </div>
+                                <p style={{ margin: '0 0 1rem 0', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{pub.Contenu}</p>
+                                {/* Affichage Media */}
+                                {pub.Media_URL && (
+                                    <div style={{ marginBottom: '1rem', textAlign: 'center', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden' }}>
+                                        {pub.Media_URL.match(/\.(mp4|webm)$/i) ? (
+                                            <video controls style={{ maxWidth: '100%', maxHeight: '400px', display: 'block', margin: '0 auto' }}>
+                                                <source src={`../Backend/${pub.Media_URL}`} type={`video/${pub.Media_URL.split('.').pop()}`} />
+                                            </video>
+                                        ) : (
+                                            <img src={`../Backend/${pub.Media_URL}`} alt="Performance" style={{ maxWidth: '100%', maxHeight: '400px', objectFit: 'contain' }} />
+                                        )}
+                                    </div>
+                                )}
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>🔥 {pub.NbLikes} Respects</span>
+                            </div>
+                        ))
+                    )}
                 </div>
             );
         }
 
         // --- COMPOSANT PRINCIPAL ---
+        // --- COMPOSANT PRINCIPAL ---
         function App() {
             const [ongletActif, setOngletActif] = React.useState('accueil');
             const [utilisateurConnecte, setUtilisateurConnecte] = React.useState(null); 
+            
+            // États pour piloter l'affichage des profils et de la messagerie
+            const [profilCible, setProfilCible] = React.useState(null); 
+            const [contactPreselectionne, setContactPreselectionne] = React.useState(null);
+
+            // Permet aux autres onglets d'ordonner l'ouverture d'un profil
+            const ouvrirProfil = (id) => setProfilCible(id);
+
+            // Bascule de la vue Profil vers la vue Messagerie
+            const demarrerDiscussion = (utilisateur) => {
+                setContactPreselectionne(utilisateur);
+                setProfilCible(null); // On ferme le profil
+                setOngletActif('messages'); // On ouvre l'onglet message
+            };
 
             return (
                 <div>
+                    {/* EN-TÊTE DU SITE */}
                     <header className="top-header">
-                        {/* Bouton pour ouvrir la page de Profil ou de Connexion */}
-                        <button className="profile-btn" onClick={() => setOngletActif('profil')}>
-                            {utilisateurConnecte ? (
-                                <>
-                                    {/* Affiche la première lettre du nom de l'utilisateur comme avatar */}
-                                    <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#333' }}>
-                                        {utilisateurConnecte.Nom.charAt(0).toUpperCase()}
-                                    </div>
-                                    <span>{utilisateurConnecte.Nom}</span>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#333' }}>👤</div>
-                                    <span>Se connecter</span>
-                                </>
-                            )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '1.5rem', color: 'var(--orange-primary)', fontWeight: 'bold' }}>Connect</span>
+                            <span style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>Hub</span>
+                        </div>
+                        <button className="profile-btn" onClick={() => { setOngletActif('profil'); setProfilCible(null); }}>
+                            <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#333' }}>
+                                {utilisateurConnecte ? utilisateurConnecte.Nom.charAt(0).toUpperCase() : '👤'}
+                            </div>
+                            <span>{utilisateurConnecte ? utilisateurConnecte.Nom : "Connexion"}</span>
                         </button>
-
-                        <h1 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--orange-primary)', letterSpacing: '1px' }}>
-                            CONNECT<span style={{ color: 'white' }}>HUB</span>
-                        </h1>
                     </header>
 
+                    {/* ZONE PRINCIPALE */}
                     <main>
-                        {/* Gestion de l'affichage de l'onglet de profil / connexion */}
-                        {ongletActif === 'profil' && (
-                            utilisateurConnecte ? (
-                                <Profil 
-                                    utilisateurConnecte={utilisateurConnecte} 
-                                    setUtilisateurConnecte={setUtilisateurConnecte}
-                                    setOngletActif={setOngletActif}
-                                />
-                            ) : (
-                                <Authentification onConnect={(user) => { 
-                                    setUtilisateurConnecte(user); 
-                                    setOngletActif('accueil'); 
-                                }} />
-                            )
-                        )}
+                        {profilCible ? (
+                            // --- VUE DU PROFIL PUBLIC ---
+                            <ProfilPublic 
+                                id={profilCible} 
+                                visiteur={utilisateurConnecte} 
+                                fermer={() => setProfilCible(null)}
+                                demarrerDiscussion={demarrerDiscussion}
+                            />
+                        ) : (
+                            // --- VUES NORMALES (Si aucun profil n'est ciblé) ---
+                            <>
+                                {/* Onglet Connexion / Mon Profil */}
+                                {ongletActif === 'profil' && (
+                                    utilisateurConnecte ? (
+                                        <Profil 
+                                            utilisateurConnecte={utilisateurConnecte} 
+                                            setUtilisateurConnecte={setUtilisateurConnecte}
+                                            setOngletActif={setOngletActif}
+                                        />
+                                    ) : (
+                                        <Authentification onConnect={(user) => { 
+                                            setUtilisateurConnecte(user); 
+                                            setOngletActif('accueil'); 
+                                        }} />
+                                    )
+                                )}
 
-                        {/* Affichage des 5 onglets principaux */}
-                        {ongletActif === 'evenements' && <Evenements />}
-                        {ongletActif === 'communautes' && <Communautes utilisateurConnecte={utilisateurConnecte} />}
-                        {ongletActif === 'accueil' && <FilActualite utilisateurConnecte={utilisateurConnecte} />}
-                        {ongletActif === 'messages' && <Messages utilisateurConnecte={utilisateurConnecte} />}
-                        {ongletActif === 'recherche' && <Recherche utilisateurConnecte={utilisateurConnecte} />}
+                                {/* Les 5 onglets principaux */}
+                                {ongletActif === 'evenements' && <Evenements utilisateurConnecte={utilisateurConnecte} />}
+                                {ongletActif === 'communautes' && <Communautes utilisateurConnecte={utilisateurConnecte} />}
+                                {ongletActif === 'accueil' && <FilActualite utilisateurConnecte={utilisateurConnecte} ouvrirProfil={ouvrirProfil} />}
+                                {ongletActif === 'messages' && <Messages utilisateurConnecte={utilisateurConnecte} contactPreselectionne={contactPreselectionne} />}
+                                {ongletActif === 'recherche' && <Recherche utilisateurConnecte={utilisateurConnecte} ouvrirProfil={ouvrirProfil} />}
+                            </>
+                        )}
                     </main>
 
                     {/* NAVIGATION FIXE BAS - 5 Onglets */}
                     <nav className="bottom-nav">
-                        <div className={`nav-item ${ongletActif === 'evenements' ? 'active' : ''}`} onClick={() => setOngletActif('evenements')}>
+                        {/* Note : j'ai ajouté setProfilCible(null) sur chaque bouton pour fermer le profil si on change d'onglet en bas */}
+                        <div className={`nav-item ${ongletActif === 'evenements' ? 'active' : ''}`} onClick={() => { setOngletActif('evenements'); setProfilCible(null); }}>
                             <span className="nav-icon">📅</span>
                             <span style={{ fontSize: '0.7rem' }}>Événements</span>
                         </div>
 
-                        <div className={`nav-item ${ongletActif === 'communautes' ? 'active' : ''}`} onClick={() => setOngletActif('communautes')}>
+                        <div className={`nav-item ${ongletActif === 'communautes' ? 'active' : ''}`} onClick={() => { setOngletActif('communautes'); setProfilCible(null); }}>
                             <span className="nav-icon">👥</span>
                             <span style={{ fontSize: '0.7rem' }}>Groupes</span>
                         </div>
                         
-                        <div className={`nav-item ${ongletActif === 'accueil' ? 'active' : ''}`} onClick={() => setOngletActif('accueil')}>
+                        <div className={`nav-item ${ongletActif === 'accueil' ? 'active' : ''}`} onClick={() => { setOngletActif('accueil'); setProfilCible(null); }}>
                             <span className="nav-icon" style={{ fontSize: '1.6rem', color: ongletActif === 'accueil' ? 'var(--orange-primary)' : 'inherit' }}>🏠</span>
                             <span style={{ fontSize: '0.7rem' }}>Accueil</span>
                         </div>
                         
-                        <div className={`nav-item ${ongletActif === 'messages' ? 'active' : ''}`} onClick={() => setOngletActif('messages')}>
+                        <div className={`nav-item ${ongletActif === 'messages' ? 'active' : ''}`} onClick={() => { setOngletActif('messages'); setProfilCible(null); }}>
                             <span className="nav-icon">💬</span>
                             <span style={{ fontSize: '0.7rem' }}>Messages</span>
                         </div>
 
-                        <div className={`nav-item ${ongletActif === 'recherche' ? 'active' : ''}`} onClick={() => setOngletActif('recherche')}>
+                        <div className={`nav-item ${ongletActif === 'recherche' ? 'active' : ''}`} onClick={() => { setOngletActif('recherche'); setProfilCible(null); }}>
                             <span className="nav-icon">🔍</span>
                             <span style={{ fontSize: '0.7rem' }}>Recherche</span>
                         </div>
