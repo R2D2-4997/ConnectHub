@@ -29,6 +29,35 @@
             color: var(--text-light);
             padding-bottom: 70px; /* Espace pour la barre de navigation en bas */
         }
+        /* === MENU NOTIFICATIONS FLOTTANT === */
+        .notif-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .notif-bell {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            position: relative;
+            padding: 0;
+            margin-right: 1rem;
+        }
+        .notif-dropdown {
+            position: absolute;
+            top: 45px;
+            right: -50px;
+            width: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.8);
+            z-index: 1000;
+            padding: 1rem;
+        }
 
         /* En-tête haut */
         .top-header {
@@ -1106,7 +1135,8 @@
             );
         }
         // --- COMPOSANT NOTIFICATIONS ---
-        function Notifications({ utilisateurConnecte }) {
+        // --- COMPOSANT MENU DÉROULANT DES NOTIFICATIONS ---
+        function NotificationsDropdown({ utilisateurConnecte, fermer }) {
             const [notifs, setNotifs] = React.useState([]);
             const [chargement, setChargement] = React.useState(true);
 
@@ -1121,29 +1151,30 @@
                 }
             }, [utilisateurConnecte]);
 
-            if (!utilisateurConnecte) return <div className="card" style={{ textAlign: 'center' }}>Veuillez vous connecter pour voir vos alertes.</div>;
-
             return (
-                <div className="card">
-                    <h2 style={{ color: 'var(--orange-primary)', marginTop: 0 }}>Activité Récente</h2>
+                <div className="notif-dropdown">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+                        <h3 style={{ margin: 0, color: 'var(--orange-primary)', fontSize: '1.1rem' }}>Alertes</h3>
+                        <button onClick={fermer} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}>✖</button>
+                    </div>
                     
                     {chargement ? (
-                        <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Vérification des alertes...</p>
+                        <p style={{ textAlign: 'center', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Vérification...</p>
                     ) : notifs.length === 0 ? (
-                        <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucune activité récente pour le moment.</p>
+                        <p style={{ textAlign: 'center', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Aucune activité récente.</p>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                             {notifs.map(n => (
                                 <div key={n.ID} style={{ 
-                                    padding: '1rem', 
+                                    padding: '0.8rem', 
                                     backgroundColor: n.Lu ? 'transparent' : '#1a1a1a', 
-                                    borderLeft: n.Lu ? '4px solid transparent' : '4px solid var(--orange-primary)', 
-                                    borderBottom: '1px solid var(--border-color)',
-                                    borderRadius: '4px'
+                                    borderLeft: n.Lu ? '3px solid transparent' : '3px solid var(--orange-primary)', 
+                                    borderRadius: '4px',
+                                    fontSize: '0.85rem'
                                 }}>
-                                    {n.Type_Action === 'Like' && <span>🔥 <strong>{n.ActeurNom}</strong> a lâché un Respect sur votre performance.</span>}
-                                    {n.Type_Action === 'Abonnement' && <span>👤 <strong>{n.ActeurNom}</strong> a commencé à vous suivre.</span>}
-                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem' }}>{n.Date_Notification}</div>
+                                    {n.Type_Action === 'Like' && <span>🔥 <strong>{n.ActeurNom}</strong> a lâché un Respect.</span>}
+                                    {n.Type_Action === 'Abonnement' && <span>👤 <strong>{n.ActeurNom}</strong> vous suit.</span>}
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.3rem' }}>{n.Date_Notification}</div>
                                 </div>
                             ))}
                         </div>
@@ -1214,13 +1245,15 @@
         }
         // --- COMPOSANT PRINCIPAL (Version intégrée et finalisée) ---
         // --- COMPOSANT PRINCIPAL DE L'APPLICATION ---
+        // --- COMPOSANT PRINCIPAL DE L'APPLICATION ---
         function App() {
             const [ongletActif, setOngletActif] = React.useState('accueil');
             const [utilisateurConnecte, setUtilisateurConnecte] = React.useState(null); 
             
-            // États pour piloter l'affichage des profils publics et raccourcis messagerie
+            // États pour les profils et les notifications
             const [profilCible, setProfilCible] = React.useState(null); 
             const [contactPreselectionne, setContactPreselectionne] = React.useState(null);
+            const [afficherNotifs, setAfficherNotifs] = React.useState(false); // Gère l'ouverture du menu cloche
 
             const ouvrirProfil = (id) => setProfilCible(id);
 
@@ -1238,18 +1271,35 @@
                             <span style={{ fontSize: '1.5rem', color: 'var(--orange-primary)', fontWeight: 'bold' }}>Connect</span>
                             <span style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>Hub</span>
                         </div>
-                        <button className="profile-btn" onClick={() => { setOngletActif('profil'); setProfilCible(null); }}>
-                            <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#333' }}>
-                                {utilisateurConnecte ? utilisateurConnecte.Nom.charAt(0).toUpperCase() : '👤'}
-                            </div>
-                            <span>{utilisateurConnecte ? utilisateurConnecte.Nom : "Connexion"}</span>
-                        </button>
+                        
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                            {/* La cloche de notifications (visible seulement si connecté) */}
+                            {utilisateurConnecte && (
+                                <div className="notif-container">
+                                    <button className="notif-bell" onClick={() => setAfficherNotifs(!afficherNotifs)}>
+                                        🔔
+                                    </button>
+                                    {afficherNotifs && (
+                                        <NotificationsDropdown 
+                                            utilisateurConnecte={utilisateurConnecte} 
+                                            fermer={() => setAfficherNotifs(false)} 
+                                        />
+                                    )}
+                                </div>
+                            )}
+
+                            <button className="profile-btn" onClick={() => { setOngletActif('profil'); setProfilCible(null); setAfficherNotifs(false); }}>
+                                <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#333' }}>
+                                    {utilisateurConnecte ? utilisateurConnecte.Nom.charAt(0).toUpperCase() : '👤'}
+                                </div>
+                                <span>{utilisateurConnecte ? utilisateurConnecte.Nom : "Connexion"}</span>
+                            </button>
+                        </div>
                     </header>
 
                     {/* ZONE PRINCIPALE DE L'APPLICATION */}
                     <main style={{ paddingBottom: '2rem' }}>
                         {profilCible ? (
-                            // Vue d'un profil ciblé
                             <ProfilPublic 
                                 id={profilCible} 
                                 visiteur={utilisateurConnecte} 
@@ -1257,9 +1307,7 @@
                                 demarrerDiscussion={demarrerDiscussion}
                             />
                         ) : (
-                            // Vues normales des onglets
                             <>
-                                {/* Profil privé & Authentification */}
                                 {ongletActif === 'profil' && (
                                     utilisateurConnecte ? (
                                         <Profil 
@@ -1275,53 +1323,45 @@
                                     )
                                 )}
 
-                                {/* Les 7 sections fonctionnelles de l'application */}
                                 {ongletActif === 'evenements' && <Evenements utilisateurConnecte={utilisateurConnecte} />}
                                 {ongletActif === 'communautes' && <Communautes utilisateurConnecte={utilisateurConnecte} />}
                                 {ongletActif === 'accueil' && <FilActualite utilisateurConnecte={utilisateurConnecte} ouvrirProfil={ouvrirProfil} />}
                                 {ongletActif === 'messages' && <Messages utilisateurConnecte={utilisateurConnecte} contactPreselectionne={contactPreselectionne} />}
                                 {ongletActif === 'recherche' && <Recherche utilisateurConnecte={utilisateurConnecte} ouvrirProfil={ouvrirProfil} />}
-                                {ongletActif === 'notifications' && <Notifications utilisateurConnecte={utilisateurConnecte} />}
                                 {ongletActif === 'moderation' && <DashboardModeration utilisateurConnecte={utilisateurConnecte} />}
                             </>
                         )}
                     </main>
 
-                    {/* NAVIGATION FIXE BAS - Barre réactive */}
+                    {/* NAVIGATION FIXE BAS (Allégée) */}
                     <nav className="bottom-nav">
-                        <div className={`nav-item ${ongletActif === 'evenements' ? 'active' : ''}`} onClick={() => { setOngletActif('evenements'); setProfilCible(null); }}>
+                        <div className={`nav-item ${ongletActif === 'evenements' ? 'active' : ''}`} onClick={() => { setOngletActif('evenements'); setProfilCible(null); setAfficherNotifs(false); }}>
                             <span className="nav-icon">📅</span>
                             <span style={{ fontSize: '0.7rem' }}>Événements</span>
                         </div>
 
-                        <div className={`nav-item ${ongletActif === 'communautes' ? 'active' : ''}`} onClick={() => { setOngletActif('communautes'); setProfilCible(null); }}>
+                        <div className={`nav-item ${ongletActif === 'communautes' ? 'active' : ''}`} onClick={() => { setOngletActif('communautes'); setProfilCible(null); setAfficherNotifs(false); }}>
                             <span className="nav-icon">👥</span>
                             <span style={{ fontSize: '0.7rem' }}>Groupes</span>
                         </div>
                         
-                        <div className={`nav-item ${ongletActif === 'accueil' ? 'active' : ''}`} onClick={() => { setOngletActif('accueil'); setProfilCible(null); }}>
+                        <div className={`nav-item ${ongletActif === 'accueil' ? 'active' : ''}`} onClick={() => { setOngletActif('accueil'); setProfilCible(null); setAfficherNotifs(false); }}>
                             <span className="nav-icon" style={{ fontSize: '1.6rem', color: ongletActif === 'accueil' ? 'var(--orange-primary)' : 'inherit' }}>🏠</span>
                             <span style={{ fontSize: '0.7rem' }}>Accueil</span>
                         </div>
                         
-                        <div className={`nav-item ${ongletActif === 'messages' ? 'active' : ''}`} onClick={() => { setOngletActif('messages'); setProfilCible(null); }}>
+                        <div className={`nav-item ${ongletActif === 'messages' ? 'active' : ''}`} onClick={() => { setOngletActif('messages'); setProfilCible(null); setAfficherNotifs(false); }}>
                             <span className="nav-icon">💬</span>
                             <span style={{ fontSize: '0.7rem' }}>Messages</span>
                         </div>
 
-                        <div className={`nav-item ${ongletActif === 'recherche' ? 'active' : ''}`} onClick={() => { setOngletActif('recherche'); setProfilCible(null); }}>
+                        <div className={`nav-item ${ongletActif === 'recherche' ? 'active' : ''}`} onClick={() => { setOngletActif('recherche'); setProfilCible(null); setAfficherNotifs(false); }}>
                             <span className="nav-icon">🔍</span>
                             <span style={{ fontSize: '0.7rem' }}>Recherche</span>
                         </div>
 
-                        <div className={`nav-item ${ongletActif === 'notifications' ? 'active' : ''}`} onClick={() => { setOngletActif('notifications'); setProfilCible(null); }}>
-                            <span className="nav-icon">🔔</span>
-                            <span style={{ fontSize: '0.7rem' }}>Notifs</span>
-                        </div>
-
-                        {/* Bouton sécurisé : Visible uniquement pour le modérateur */}
                         {utilisateurConnecte?.Role === 'Moderateur' && (
-                            <div className={`nav-item ${ongletActif === 'moderation' ? 'active' : ''}`} onClick={() => { setOngletActif('moderation'); setProfilCible(null); }}>
+                            <div className={`nav-item ${ongletActif === 'moderation' ? 'active' : ''}`} onClick={() => { setOngletActif('moderation'); setProfilCible(null); setAfficherNotifs(false); }}>
                                 <span className="nav-icon">🛡️</span>
                                 <span style={{ fontSize: '0.7rem' }}>Admin</span>
                             </div>
@@ -1330,7 +1370,6 @@
                 </div>
             );
         }
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
