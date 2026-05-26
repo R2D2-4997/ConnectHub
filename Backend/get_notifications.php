@@ -3,23 +3,28 @@ require_once("config.php");
 $user_id = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
 
 if ($user_id > 0) {
-    // 1. On récupère les notifications
+    // 1. On récupère les notifications avec le nom de l'acteur
     $sql = "SELECT n.ID, n.Type_Action, n.Lu, n.Date_Notification, u.Nom AS ActeurNom 
-            FROM Notifications n
-            JOIN Utilisateurs u ON n.Acteur_ID = u.ID
+            FROM notifications n
+            JOIN utilisateurs u ON n.Acteur_ID = u.ID
             WHERE n.Utilisateur_ID = $user_id
             ORDER BY n.Date_Notification DESC LIMIT 50";
-    
-    $res = mysqli_query($conn, $sql);
+            
+    $result = mysqli_query($conn, $sql);
     $notifs = [];
-    while($row = mysqli_fetch_assoc($res)) {
-        $notifs[] = $row;
+    
+    if ($result) {
+        while ($row = mysqli_fetch_assoc($result)) {
+            $notifs[] = $row;
+        }
+        
+        // 2. On marque les notifications comme lues (Lu = 1)
+        mysqli_query($conn, "UPDATE notifications SET Lu = 1 WHERE Utilisateur_ID = $user_id AND Lu = 0");
+        
+        echo json_encode($notifs);
+    } else {
+        echo json_encode(["erreur" => "Erreur SQL : " . mysqli_error($conn)]);
     }
-    
-    // 2. On les marque comme "Lues"
-    mysqli_query($conn, "UPDATE Notifications SET Lu = TRUE WHERE Utilisateur_ID = $user_id AND Lu = FALSE");
-    
-    echo json_encode($notifs);
 } else {
     echo json_encode(["erreur" => "Utilisateur non connecté"]);
 }
