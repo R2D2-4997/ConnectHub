@@ -1,26 +1,28 @@
 <?php
 require_once("config.php");
+$user_id = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
 
-$sql = "SELECT e.ID, e.Titre, e.Description, e.Date_Evenement, e.Lieu, u.Nom AS Createur,
-        (SELECT COUNT(*) FROM Participants_Evenements WHERE Evenement_ID = e.ID) AS NbParticipants
-        FROM Evenements e
-        JOIN Utilisateurs u ON e.Createur_ID = u.ID
-        WHERE e.Date_Evenement >= CURDATE()
-        ORDER BY e.Date_Evenement ASC";
+// Requête adaptée : tables au pluriel et suppression du Createur_ID qui n'existe pas dans votre MCD
+$sql = "SELECT ID, Titre, Description, Lieu, Date_evenement, 
+        DATE_FORMAT(Date_evenement, '%d/%m/%Y %H:%i') AS Date_Formatee,
+        'La Communauté' AS Createur,
+        (SELECT COUNT(*) FROM participants_evenements WHERE Evenement_ID = evenements.ID) AS NbParticipants,
+        (SELECT COUNT(*) FROM participants_evenements WHERE Evenement_ID = evenements.ID AND Utilisateur_ID = $user_id) AS EstInscrit
+        FROM evenements
+        ORDER BY Date_evenement ASC";
 
 $result = mysqli_query($conn, $sql);
 $evenements = [];
 
 if ($result) {
     while ($row = mysqli_fetch_assoc($result)) {
-        // On formate un peu la date en PHP pour qu'elle soit plus jolie pour React
-        $date = new DateTime($row['Date_Evenement']);
-        $row['Date_Formatee'] = $date->format('d/m/Y à H:i');
+        // EstInscrit devient un booléen (true/false) pour React
+        $row['EstInscrit'] = ($row['EstInscrit'] > 0); 
         $evenements[] = $row;
     }
     echo json_encode($evenements);
 } else {
-    echo json_encode(["erreur" => "Erreur de chargement : " . mysqli_error($conn)]);
+    echo json_encode(["erreur" => "Erreur SQL : " . mysqli_error($conn)]);
 }
 mysqli_close($conn);
 ?>
