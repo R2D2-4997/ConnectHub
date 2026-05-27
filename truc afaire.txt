@@ -1,7 +1,6 @@
 enlever curseur de texte 
 pouvoir rejoindre les communautés necessaire pour post 
 ajouter admin de communautés qui valide ou non de rentrer dans la commu 
-avoir un chat d'evenement rejoind automatiquement lors de la participation a un evenement qui apparait dans l onglet message 
 Rendre fonctionnel l ognlet tout de la recherche et evenement ( lieu date et description )
 ajouter calendrier evenement 
 ajouter option de trie dans rechercher
