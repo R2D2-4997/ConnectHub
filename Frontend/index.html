@@ -644,7 +644,7 @@
                 </div>
             );
         }
-        // --- COMPOSANT RECHERCHE (Avec option Tout) ---
+        // --- COMPOSANT RECHERCHE (Syntaxe Corrigée) ---
         function Recherche({ utilisateurConnecte, ouvrirProfil }) {
             const [requete, setRequete] = React.useState("");
             const [ongletActif, setOngletActif] = React.useState("tous");
@@ -671,12 +671,12 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ requete: requete, type: ongletActif })
                 })
-                    .then(res => res.json())
-                    .then(data => {
-                        setResultats(data);
-                        setChargement(false);
-                    })
-                    .catch(err => { console.error(err); setChargement(false); });
+                .then(res => res.json())
+                .then(data => {
+                    setResultats(data);
+                    setChargement(false);
+                })
+                .catch(err => { console.error(err); setChargement(false); });
 
             }, [requete, ongletActif]);
 
@@ -685,18 +685,18 @@
                     <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
                         <div style={{ position: 'relative' }}>
                             <span style={{ position: 'absolute', left: '15px', top: '15px', fontSize: '1.2rem' }}>🔍</span>
-                            <input
-                                type="text"
+                            <input 
+                                type="text" 
                                 placeholder="Recherche globale ConnectHub..."
                                 value={requete}
                                 onChange={(e) => setRequete(e.target.value)}
-                                style={{ width: '100%', padding: '1rem 1rem 1rem 3rem', borderRadius: '25px', backgroundColor: '#111', border: '1px solid var(--border-color)', color: 'white' }}
+                                style={{ width: '100%', padding: '1rem 1rem 1rem 3rem', borderRadius: '25px', backgroundColor: '#111', border: '1px solid var(--border-color)', color: 'white' }} 
                             />
                         </div>
 
                         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
                             {onglets.map(onglet => (
-                                <button
+                                <button 
                                     key={onglet.id}
                                     onClick={() => setOngletActif(onglet.id)}
                                     style={{
@@ -726,27 +726,33 @@
                         ) : (
                             resultats.map((res, index) => (
                                 <div key={res.ID || index} className="card" style={{ padding: '1rem', marginBottom: '0.5rem' }}>
-
-                                    {res.Type_Source === 'utilisateur' || ongletActif === 'utilisateurs' ? (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }} onClick={() => ouvrirProfil(res.ID)}>
-                                            <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '40px', height: '40px' }}>{res.Nom.charAt(0)}</div>
-                                            <div>
-                                                <div style={{ fontWeight: 'bold' }}>{res.Nom}</div>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Athlète • {res.Role}</div>
+                                    {
+                                        res.Type_Source === 'utilisateur' || (!res.Type_Source && ongletActif === 'utilisateurs') ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }} onClick={() => ouvrirProfil(res.ID)}>
+                                                <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '40px', height: '40px' }}>{res.Nom ? res.Nom.charAt(0) : 'U'}</div>
+                                                <div>
+                                                    <div style={{ fontWeight: 'bold' }}>{res.Nom}</div>
+                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Athlète • {res.Role || 'Membre'}</div>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ) : res.Type_Source === 'communaute' || ongletActif === 'communautes' ? (
-                                        <div>
-                                            <div style={{ fontWeight: 'bold', color: 'var(--orange-primary)' }}>👥 {res.Nom}</div>
-                                            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{res.Description}</p>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <div className="post-author" style={{ fontSize: '0.9rem', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => ouvrirProfil(res.Auteur_ID)}>{res.Nom}</div>
-                                            <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>{res.Contenu}</p>
-                                        </div>
-                                    )}
-
+                                        ) : res.Type_Source === 'communaute' || (!res.Type_Source && ongletActif === 'communautes') ? (
+                                            <div>
+                                                <div style={{ fontWeight: 'bold', color: 'var(--orange-primary)' }}>👥 r/{res.Nom}</div>
+                                                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{res.Description}</p>
+                                            </div>
+                                        ) : res.Type_Source === 'evenement' || (!res.Type_Source && ongletActif === 'evenements') ? (
+                                            <div>
+                                                <div style={{ fontWeight: 'bold', color: '#28a745' }}>📅 {res.Nom}</div>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>📍 {res.Lieu}</div>
+                                                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{res.Description}</p>
+                                            </div>
+                                        ) : res.Type_Source === 'publication' || (!res.Type_Source && ongletActif === 'publications') ? (
+                                            <div>
+                                                <div className="post-author" style={{ fontSize: '0.9rem', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => ouvrirProfil(res.Auteur_ID)}>{res.Nom}</div>
+                                                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>{res.Contenu}</p>
+                                            </div>
+                                        ) : null
+                                    }
                                 </div>
                             ))
                         )}
@@ -754,8 +760,7 @@
                 </div>
             );
         }
-        // --- COMPOSANT COMMUNAUTÉS (Modération 100% locale, sans Admin Global) ---
-        // --- COMPOSANT COMMUNAUTÉS (Avec panneau d'administration complet) ---
+        // --- COMPOSANT COMMUNAUTÉS (Avec panneau de validation dynamique) ---
         function Communautes({ utilisateurConnecte, modalOuverte, fermerModal }) {
             const [listeCommunautes, setListeCommunautes] = React.useState([]);
             const [communauteActive, setCommunauteActive] = React.useState(null); 
@@ -763,8 +768,9 @@
             
             // États de l'administration locale
             const [vueModeration, setVueModeration] = React.useState(false); 
-            const [ongletAdmin, setOngletAdmin] = React.useState('membres'); // 'demandes' ou 'membres'
+            const [ongletAdmin, setOngletAdmin] = React.useState('demandes'); 
             const [listeMembres, setListeMembres] = React.useState([]);
+            const [listeDemandes, setListeDemandes] = React.useState([]); // NOUVEAU : Stockage des vraies demandes
             
             const [nouveauGroupe, setNouveauGroupe] = React.useState({ nom: '', description: '' });
             const [nouveauPost, setNouveauPost] = React.useState({ titre: '', contenu: '' });
@@ -778,6 +784,7 @@
             const ouvrirCommunaute = (communaute) => {
                 setCommunauteActive(communaute);
                 setVueModeration(false);
+                setOngletAdmin('demandes'); // Par défaut on ouvre l'onglet des demandes
                 chargerDiscussions(communaute.ID);
             };
 
@@ -791,32 +798,53 @@
                     .then(r => r.json()).then(data => setListeMembres(data.erreur ? [] : data));
             };
 
-            // Ouverture/Fermeture du panneau admin et chargement des données
+            const chargerDemandesAdmin = (id) => {
+                fetch(`../Backend/get_demandes_communaute.php?communaute_id=${id}`)
+                    .then(r => r.json()).then(data => setListeDemandes(data.erreur ? [] : data));
+            };
+
             const basculerModeration = () => {
                 if (!vueModeration) {
+                    chargerDemandesAdmin(communauteActive.ID);
                     chargerMembresAdmin(communauteActive.ID);
                 }
                 setVueModeration(!vueModeration);
             };
 
-            // Promotion d'un membre
-            const handlePromouvoir = (cibleId, cibleNom) => {
-                if (!confirm(`Voulez-vous vraiment nommer ${cibleNom} modérateur de ce groupe ?`)) return;
-                
-                fetch("../Backend/promouvoir_moderateur.php", {
+            // Traitement (Accepter/Refuser)
+            const handleGererDemande = (demandeurId, actionRequise) => {
+                fetch("../Backend/gerer_demande_communaute.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ 
                         communaute_id: communauteActive.ID, 
-                        cible_id: cibleId,
-                        moderateur_id: utilisateurConnecte.ID
+                        demandeur_id: demandeurId,
+                        moderateur_id: utilisateurConnecte.ID,
+                        action: actionRequise
                     })
                 })
                 .then(res => res.json()).then(data => {
                     if (data.erreur) alert("❌ " + data.erreur);
                     else {
+                        chargerDemandesAdmin(communauteActive.ID); 
+                        chargerMembresAdmin(communauteActive.ID); 
+                        chargerCommunautes(); 
+                    }
+                });
+            };
+
+            const handlePromouvoir = (cibleId, cibleNom) => {
+                if (!confirm(`Voulez-vous vraiment nommer ${cibleNom} modérateur de ce groupe ?`)) return;
+                fetch("../Backend/promouvoir_moderateur.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ communaute_id: communauteActive.ID, cible_id: cibleId, moderateur_id: utilisateurConnecte.ID })
+                })
+                .then(res => res.json()).then(data => {
+                    if (data.erreur) alert("❌ " + data.erreur);
+                    else {
                         alert("✅ " + data.succes);
-                        chargerMembresAdmin(communauteActive.ID); // Rafraîchit la liste des membres
+                        chargerMembresAdmin(communauteActive.ID);
                     }
                 });
             };
@@ -975,19 +1003,22 @@
 
                             {vueModeration ? (
                                 <div className="card" style={{ border: '1px dashed #dc3545' }}>
-                                    {/* Onglets d'administration locale */}
                                     <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
                                         <button onClick={() => setOngletAdmin('demandes')} style={{ background: 'none', border: 'none', color: ongletAdmin === 'demandes' ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.9rem' }}>En attente</button>
                                         <button onClick={() => setOngletAdmin('membres')} style={{ background: 'none', border: 'none', color: ongletAdmin === 'membres' ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.9rem' }}>Membres Actifs</button>
                                     </div>
 
                                     {ongletAdmin === 'demandes' ? (
-                                        <div style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#111', borderRadius: '8px', fontSize: '0.9rem' }}>
-                                            Demande de : <strong style={{color: 'white'}}>Athlète_Du_Dimanche</strong> (Simulation)
-                                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
-                                                <button className="btn-primary" style={{ backgroundColor: '#28a745', padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Approuver</button>
-                                                <button className="btn-primary" style={{ backgroundColor: '#dc3545', padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Rejeter</button>
-                                            </div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            {listeDemandes.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Aucune demande en attente.</p> : listeDemandes.map(d => (
+                                                <div key={d.ID} style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#111', borderRadius: '8px', fontSize: '0.9rem' }}>
+                                                    Demande de : <strong style={{color: 'white'}}>{d.Nom}</strong>
+                                                    <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
+                                                        <button onClick={() => handleGererDemande(d.ID, 'accepter')} className="btn-primary" style={{ backgroundColor: '#28a745', padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Approuver</button>
+                                                        <button onClick={() => handleGererDemande(d.ID, 'rejeter')} className="btn-primary" style={{ backgroundColor: '#dc3545', padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Rejeter</button>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     ) : (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
