@@ -1,0 +1,16 @@
+enlever curseur de texte 
+pouvoir rejoindre les communautés necessaire pour post 
+ajouter admin de communautés qui valide ou non de rentrer dans la commu 
+avoir un chat d'evenement rejoind automatiquement lors de la participation a un evenement qui apparait dans l onglet message 
+Rendre fonctionnel l ognlet tout de la recherche et evenement ( lieu date et description )
+ajouter calendrier evenement 
+ajouter option de trie dans rechercher
+partager une publication
+message d alerte non connecter lors d interaction de communauté et interaction avec les post de communautés
+ajouter groupe de message 
+gestion de l etat des notifs 
+redirection depuis une notif
+Blocage des publications invalides ou répétitives
+mode clair 
+publication epinglés 
+menu de signalement integrés

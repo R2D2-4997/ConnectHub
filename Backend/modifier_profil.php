@@ -1,49 +1,40 @@
 <?php
 require_once("config.php");
 
-$data = json_decode(file_get_contents("php://input"));
+// React enverra désormais un objet FormData, on utilise donc $_POST et $_FILES
+$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
 
-if (isset($data->id) && isset($data->nom) && isset($data->email)) {
-    
-    $id = (int) $data->id;
-    $nom = mysqli_real_escape_string($conn, htmlspecialchars($data->nom));
-    $email = mysqli_real_escape_string($conn, htmlspecialchars($data->email));
-    $nouveau_mdp = isset($data->motDePasse) ? $data->motDePasse : '';
+if ($id > 0) {
+    $nom = mysqli_real_escape_string($conn, $_POST['nom']);
+    $email = mysqli_real_escape_string($conn, $_POST['email']);
+    $mdp = isset($_POST['motDePasse']) ? $_POST['motDePasse'] : '';
 
-    // 1. Vérifier que le nouvel email n'est pas déjà pris par un autre utilisateur
-    $check_sql = "SELECT ID FROM Utilisateurs WHERE Email = '$email' AND ID != $id";
-    $check_result = mysqli_query($conn, $check_sql);
-
-    if (mysqli_num_rows($check_result) > 0) {
-        echo json_encode(["erreur" => "Cette adresse email est déjà utilisée par un autre compte."]);
-        exit;
+    $sql = "UPDATE utilisateurs SET Nom='$nom', Email='$email'";
+    if (!empty($mdp)) {
+        $sql .= ", MotDePasse='$mdp'"; 
     }
+    $sql .= " WHERE ID=$id";
+    mysqli_query($conn, $sql);
 
-    // 2. Préparer la requête de mise à jour
-    if (!empty($nouveau_mdp)) {
-        // L'utilisateur veut changer son mot de passe
-        $motDePasseHache = password_hash($nouveau_mdp, PASSWORD_DEFAULT);
-        $sql = "UPDATE Utilisateurs SET Nom='$nom', Email='$email', MotDePasse='$motDePasseHache' WHERE ID=$id";
-    } else {
-        // L'utilisateur ne change que son nom et/ou email
-        $sql = "UPDATE Utilisateurs SET Nom='$nom', Email='$email' WHERE ID=$id";
-    }
-
-    // 3. Exécuter la mise à jour
-    if (mysqli_query($conn, $sql)) {
-        // Récupérer les nouvelles informations pour mettre à jour l'interface React
-        $sql_get = "SELECT ID, Nom, Email, Role FROM Utilisateurs WHERE ID = $id";
-        $res_get = mysqli_query($conn, $sql_get);
-        $user = mysqli_fetch_assoc($res_get);
+    // --- SAUVEGARDE DE LA PHOTO DE PROFIL ---
+    if (isset($_FILES['avatar']) && $_FILES['avatar']['error'] === 0) {
+        if (!is_dir('uploads')) { mkdir('uploads', 0777, true); } // Crée le dossier s'il manque
         
-        echo json_encode(["succes" => "Vos informations ont été mises à jour.", "utilisateur" => $user]);
-    } else {
-        echo json_encode(["erreur" => "Erreur lors de la mise à jour : " . mysqli_error($conn)]);
+        $ext = pathinfo($_FILES['avatar']['name'], PATHINFO_EXTENSION);
+        $filename = "uploads/avatar_" . $id . "_" . time() . "." . $ext;
+        
+        if (move_uploaded_file($_FILES['avatar']['tmp_name'], $filename)) {
+            mysqli_query($conn, "UPDATE utilisateurs SET Photo_Profil='$filename' WHERE ID=$id");
+        }
     }
 
+    // On renvoie l'utilisateur mis à jour pour rafraîchir React
+    $res = mysqli_query($conn, "SELECT ID, Nom, Email, Role, Photo_Profil FROM utilisateurs WHERE ID=$id");
+    $user = mysqli_fetch_assoc($res);
+    
+    echo json_encode(["succes" => "Profil mis à jour !", "utilisateur" => $user]);
 } else {
-    echo json_encode(["erreur" => "Données manquantes."]);
+    echo json_encode(["erreur" => "ID manquant"]);
 }
-
 mysqli_close($conn);
 ?>

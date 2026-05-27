@@ -1,32 +1,20 @@
 <?php
 require_once("config.php");
-
 $data = json_decode(file_get_contents("php://input"));
 
 if (isset($data->communaute_id) && isset($data->utilisateur_id)) {
-    $communaute_id = (int) $data->communaute_id;
-    $utilisateur_id = (int) $data->utilisateur_id;
+    $c_id = (int)$data->communaute_id;
+    $u_id = (int)$data->utilisateur_id;
 
-    // Logique métier : Vérifier si l'utilisateur est déjà membre du groupe
-    $check_sql = "SELECT * FROM Membres_Communautes WHERE Communaute_ID = $communaute_id AND Utilisateur_ID = $utilisateur_id";
-    $check_result = mysqli_query($conn, $check_sql);
-
-    if (mysqli_num_rows($check_result) > 0) {
-        // Déjà membre
-        echo json_encode(["info" => "Vous faites déjà partie de ce groupe d'entraînement !"]);
+    $check = mysqli_query($conn, "SELECT Statut FROM membres_communautes WHERE Utilisateur_ID = $u_id AND Communaute_ID = $c_id");
+    
+    if (mysqli_num_rows($check) > 0) {
+        echo json_encode(["info" => "Vous avez déjà interagi avec ce groupe."]);
     } else {
-        // Pas encore membre, on l'ajoute
-        $insert_sql = "INSERT INTO Membres_Communautes (Communaute_ID, Utilisateur_ID) VALUES ($communaute_id, $utilisateur_id)";
-        
-        if (mysqli_query($conn, $insert_sql)) {
-            echo json_encode(["succes" => "Vous avez rejoint la communauté avec succès !"]);
-        } else {
-            echo json_encode(["erreur" => "Erreur lors de l'inscription : " . mysqli_error($conn)]);
-        }
+        $insert = mysqli_query($conn, "INSERT INTO membres_communautes (Utilisateur_ID, Communaute_ID, Role_Communaute, Statut) VALUES ($u_id, $c_id, 'Membre', 'En_Attente')");
+        if ($insert) echo json_encode(["succes" => "Demande d'adhésion envoyée au modérateur !"]);
+        else echo json_encode(["erreur" => "Erreur SQL : " . mysqli_error($conn)]);
     }
-} else {
-    echo json_encode(["erreur" => "Données manquantes."]);
 }
-
 mysqli_close($conn);
 ?>
