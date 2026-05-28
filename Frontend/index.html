@@ -21,6 +21,29 @@
             --text-muted: #aaaaaa;
             --border-color: #333333;
         }
+        /* === THÈME CLAIR (Surcharge des variables) === */
+        body.light-mode {
+            --bg-dark: #f0f2f5;
+            --bg-card: #ffffff;
+            --orange-primary: #FF6B00; /* On garde l'orange emblématique */
+            --orange-hover: #e65c00;
+            --text-light: #121212; /* Le texte devient foncé */
+            --text-muted: #666666;
+            --border-color: #dddddd;
+        }
+
+        /* Astuce pour forcer les inputs/textareas à s'adapter même avec des styles en ligne */
+        body.light-mode input, 
+        body.light-mode textarea {
+            background-color: var(--bg-card) !important;
+            color: var(--text-light) !important;
+            border-color: var(--border-color) !important;
+        }
+
+        body.light-mode .modal-content,
+        body.light-mode .notif-dropdown {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -2057,7 +2080,7 @@
                 </div>
             );
         }
-       // --- COMPOSANT PRINCIPAL DE L'APPLICATION (Mise à jour pour les props des Notifs) ---
+       // --- COMPOSANT PRINCIPAL DE L'APPLICATION (Avec Mode Clair/Sombre) ---
         function App() {
             const [ongletActif, setOngletActif] = React.useState('accueil');
             const [utilisateurConnecte, setUtilisateurConnecte] = React.useState(null);
@@ -2066,6 +2089,28 @@
             const [contactPreselectionne, setContactPreselectionne] = React.useState(null);
             const [afficherNotifs, setAfficherNotifs] = React.useState(false);
             const [modalCreationOuverte, setModalCreationOuverte] = React.useState(false);
+
+            // --- GESTION DU THÈME ---
+            const [isLightMode, setIsLightMode] = React.useState(false);
+
+            // Charger la préférence au démarrage
+            React.useEffect(() => {
+                const savedTheme = localStorage.getItem('connecthub_theme');
+                if (savedTheme === 'light') {
+                    setIsLightMode(true);
+                }
+            }, []);
+
+            // Appliquer la classe CSS et sauvegarder
+            React.useEffect(() => {
+                if (isLightMode) {
+                    document.body.classList.add('light-mode');
+                    localStorage.setItem('connecthub_theme', 'light');
+                } else {
+                    document.body.classList.remove('light-mode');
+                    localStorage.setItem('connecthub_theme', 'dark');
+                }
+            }, [isLightMode]);
 
             const ouvrirProfil = (id) => setProfilCible(id);
 
@@ -2095,6 +2140,16 @@
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            
+                            {/* BOUTON THÈME */}
+                            <button 
+                                onClick={() => setIsLightMode(!isLightMode)} 
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.3rem', padding: 0 }}
+                                title="Changer de thème"
+                            >
+                                {isLightMode ? '🌙' : '☀️'}
+                            </button>
+
                             {utilisateurConnecte && (
                                 <div className="notif-container">
                                     <button className="notif-bell" onClick={() => setAfficherNotifs(!afficherNotifs)}>🔔</button>
@@ -2113,7 +2168,7 @@
                                 {utilisateurConnecte && utilisateurConnecte.Photo_Profil ? (
                                     <img src={`../Backend/${utilisateurConnecte.Photo_Profil}`} alt="Profil" className="profile-pic" />
                                 ) : (
-                                    <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#333' }}>
+                                    <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: 'var(--bg-dark)' }}>
                                         {utilisateurConnecte ? utilisateurConnecte.Nom.charAt(0).toUpperCase() : '👤'}
                                     </div>
                                 )}
@@ -2135,7 +2190,7 @@
                                 {profilCible ? (
                                     <ProfilPublic id={profilCible} visiteur={utilisateurConnecte} fermer={() => setProfilCible(null)} demarrerDiscussion={demarrerDiscussion} />
                                 ) : (
-                                    <>
+                                    <React.Fragment>
                                         {ongletActif === 'profil' && (
                                             utilisateurConnecte ? <Profil utilisateurConnecte={utilisateurConnecte} setUtilisateurConnecte={setUtilisateurConnecte} setOngletActif={setOngletActif} />
                                                 : <Authentification onConnect={(user) => { setUtilisateurConnecte(user); setOngletActif('accueil'); }} />
@@ -2147,7 +2202,7 @@
                                         {ongletActif === 'messages' && <Messages utilisateurConnecte={utilisateurConnecte} contactPreselectionne={contactPreselectionne} />}
                                         {ongletActif === 'recherche' && <Recherche utilisateurConnecte={utilisateurConnecte} ouvrirProfil={ouvrirProfil} />}
                                         {ongletActif === 'moderation' && <DashboardModeration utilisateurConnecte={utilisateurConnecte} />}
-                                    </>
+                                    </React.Fragment>
                                 )}
                             </div>
                         </div>
