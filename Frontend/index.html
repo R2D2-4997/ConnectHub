@@ -435,7 +435,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // --- COMPOSANT PROFIL PERSONNEL (Avec publications épinglées) ---
+       // --- COMPOSANT PROFIL PERSONNEL ---
         function Profil({ utilisateurConnecte, setUtilisateurConnecte, setOngletActif }) {
             const [sousOnglet, setSousOnglet] = React.useState('publications');
             const [modeEditionForm, setModeEditionForm] = React.useState(false);
@@ -491,16 +491,28 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ publication_id: pubId, utilisateur_id: utilisateurConnecte.ID })
                 })
-                .then(res => res.json())
-                .then(data => {
-                    if (!data.erreur) chargerDonneesPerso(); // Recharge pour appliquer le tri
-                });
+                .then(res => res.text())
+                .then(text => {
+                    try {
+                        const data = JSON.parse(text);
+                        if (data.erreur) {
+                            alert("Erreur Serveur : " + data.erreur);
+                        } else {
+                            chargerDonneesPerso();
+                        }
+                    } catch(e) {
+                        alert("Erreur fatale (Voir console F12). Réponse du serveur : " + text);
+                        console.error("Réponse brute du serveur :", text);
+                    }
+                })
+                .catch(err => alert("Erreur réseau : " + err));
             };
 
             const uStats = donneesReseau ? donneesReseau.utilisateurs || donneesReseau.utilisateur : utilisateurConnecte;
             
-            // Tri des publications : les épinglées en premier
-            const mesPubs = donneesReseau ? [...donneesReseau.publications].sort((a, b) => (b.Est_Epingle || 0) - (a.Est_Epingle || 0)) : [];
+            const mesPubs = donneesReseau && donneesReseau.publications 
+                ? [...donneesReseau.publications].sort((a, b) => (b.Est_Epingle || 0) - (a.Est_Epingle || 0)) 
+                : [];
 
             return (
                 <div>
@@ -544,7 +556,19 @@
                                     </div>
 
                                     <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{pub.Contenu}</p>
-                                    {pub.Media_URL && <div style={{ textAlign: 'center', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden', marginBottom: '1rem' }}><img src={`../Backend/${pub.Media_URL}`} style={{ maxWidth: '100%', maxHeight: '350px', objectFit: 'contain' }} /></div>}
+                                    
+                                    {pub.Media_URL && (
+                                        <div style={{ textAlign: 'center', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden', marginBottom: '1rem' }}>
+                                            {pub.Media_URL.match(/\.(mp4|webm|ogg)$/i) ? (
+                                                <video controls style={{ maxWidth: '100%', maxHeight: '350px', display: 'block', margin: '0 auto' }}>
+                                                    <source src={`../Backend/${pub.Media_URL}`} type={`video/${pub.Media_URL.split('.').pop()}`} />
+                                                </video>
+                                            ) : (
+                                                <img src={`../Backend/${pub.Media_URL}`} style={{ maxWidth: '100%', maxHeight: '350px', objectFit: 'contain' }} alt="Performance" />
+                                            )}
+                                        </div>
+                                    )}
+                                    
                                     <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>🔥 {pub.NbLikes} Respects reçus</span>
                                 </div>
                             ))}
@@ -1542,7 +1566,7 @@
             );
         }
 
-       // --- COMPOSANT FIL D'ACTUALITÉ (Chaque post dans sa propre carte) ---
+       // --- COMPOSANT FIL D'ACTUALITÉ COMPLET ---
         function FilActualite({ utilisateurConnecte, ouvrirProfil, modalOuverte, fermerModal }) {
             const [nouveauMessage, setNouveauMessage] = React.useState("");
             const [fichierMedia, setFichierMedia] = React.useState(null);
@@ -1582,7 +1606,7 @@
                 fetch("../Backend/ajouter_publication.php", { method: "POST", body: formData })
                 .then(res => res.json())
                 .then(data => {
-                    if (data.erreur) alert("Erreur : " + data.erreur);
+                    if (data.erreur) alert("❌ " + data.erreur);
                     else { setNouveauMessage(""); setFichierMedia(null); fermerModal(); chargerPublications(); }
                 });
             };
@@ -1658,7 +1682,7 @@
                 })
                 .then(res => res.json())
                 .then(data => {
-                    if(!data.erreur) { alert("Partagé en message privé !"); setPubAPartager(null); }
+                    if(!data.erreur) { alert("✅ Partagé en message privé !"); setPubAPartager(null); }
                 });
             };
 
@@ -1667,8 +1691,8 @@
                     {modalOuverte && (
                         <div className="modal-overlay" onClick={fermerModal}>
                             <div className="modal-content" onClick={e => e.stopPropagation()}>
-                                <button className="modal-close" onClick={fermerModal}>X</button>
-                                <h3 style={{ marginTop: 0, color: '#FF6B00' }}>Partager une performance</h3>
+                                <button className="modal-close" onClick={fermerModal}>✖</button>
+                                <h3 style={{ marginTop: 0, color: 'var(--orange-primary)' }}>Partager une performance</h3>
                                 <form onSubmit={handlePublier} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                     <textarea value={nouveauMessage} onChange={(e) => setNouveauMessage(e.target.value)} placeholder="Décrivez votre séance, posez une question..." rows="4" required={!fichierMedia} />
                                     <input type="file" accept="image/*,video/*" onChange={(e) => setFichierMedia(e.target.files[0])} style={{ padding: 0 }} />
@@ -1679,8 +1703,8 @@
                     )}
 
                     <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', justifyContent: 'center' }}>
-                        <button onClick={() => setFluxActif("recommandations")} style={{ background: 'none', border: 'none', color: fluxActif === "recommandations" ? '#FF6B00' : '#aaa', fontWeight: 'bold', cursor: 'pointer', fontSize: '1.1rem', borderBottom: fluxActif === "recommandations" ? '2px solid #FF6B00' : 'none', paddingBottom: '0.3rem' }}>Pour vous</button>
-                        {utilisateurConnecte && <button onClick={() => setFluxActif("abonnes")} style={{ background: 'none', border: 'none', color: fluxActif === "abonnes" ? '#FF6B00' : '#aaa', fontWeight: 'bold', cursor: 'pointer', fontSize: '1.1rem', borderBottom: fluxActif === "abonnes" ? '2px solid #FF6B00' : 'none', paddingBottom: '0.3rem' }}>Abonnements</button>}
+                        <button onClick={() => setFluxActif("recommandations")} style={{ background: 'none', border: 'none', color: fluxActif === "recommandations" ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer', fontSize: '1.1rem', borderBottom: fluxActif === "recommandations" ? '2px solid var(--orange-primary)' : 'none', paddingBottom: '0.3rem' }}>Pour vous</button>
+                        {utilisateurConnecte && <button onClick={() => setFluxActif("abonnes")} style={{ background: 'none', border: 'none', color: fluxActif === "abonnes" ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer', fontSize: '1.1rem', borderBottom: fluxActif === "abonnes" ? '2px solid var(--orange-primary)' : 'none', paddingBottom: '0.3rem' }}>Abonnements</button>}
                     </div>
 
                     <div>
@@ -1690,22 +1714,23 @@
                             <div className="card"><p style={{ textAlign: 'center' }}>Aucune publication.</p></div>
                         ) : publications.map(pub => (
                             <div key={pub.ID} className="card post" style={{ marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: 'none' }}>
+                                
                                 <div className="post-header">
                                     <span className="post-author" onClick={() => ouvrirProfil(pub.Auteur_ID)} style={{ cursor: 'pointer', textDecoration: 'underline' }}>{pub.Nom}</span>
                                     {utilisateurConnecte && utilisateurConnecte.ID === pub.Auteur_ID && idPostEnEdition !== pub.ID ? (
                                         <div style={{ display: 'flex', gap: '0.6rem' }}>
-                                            <button onClick={() => activerEditionInline(pub)} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>Modifier</button>
+                                            <button onClick={() => activerEditionInline(pub)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>Modifier</button>
                                             <button onClick={() => { setIdPostEnSuppression(pub.ID); setIdPostEnEdition(null); setIdPostEnSignalement(null); setPubAPartager(null); }} style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>Supprimer</button>
                                         </div>
                                     ) : utilisateurConnecte && utilisateurConnecte.ID !== pub.Auteur_ID && (
-                                        <button onClick={() => fetch("../Backend/suivre_utilisateur.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ suiveur_id: utilisateurConnecte.ID, suivi_id: pub.Auteur_ID }) }).then(() => chargerPublications())} style={{ backgroundColor: pub.EstAbonne ? '#333' : 'transparent', color: pub.EstAbonne ? 'white' : '#FF6B00', border: '1px solid #FF6B00', borderRadius: '15px', padding: '0.2rem 0.8rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>{pub.EstAbonne ? "Abonné" : "+ Suivre"}</button>
+                                        <button onClick={() => fetch("../Backend/suivre_utilisateur.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ suiveur_id: utilisateurConnecte.ID, suivi_id: pub.Auteur_ID }) }).then(() => chargerPublications())} style={{ backgroundColor: pub.EstAbonne ? '#333' : 'transparent', color: pub.EstAbonne ? 'white' : 'var(--orange-primary)', border: '1px solid var(--orange-primary)', borderRadius: '15px', padding: '0.2rem 0.8rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>{pub.EstAbonne ? "Abonné ✓" : "+ Suivre"}</button>
                                     )}
                                 </div>
-                                <span className="post-date" style={{ display: 'block', marginBottom: '1rem', fontSize: '0.85rem', color: '#aaa' }}>{pub.Date_Publication}</span>
+                                <span className="post-date" style={{ display: 'block', marginBottom: '1rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{pub.Date_Publication}</span>
 
                                 {idPostEnSuppression === pub.ID && (
                                     <div style={{ backgroundColor: 'rgba(220, 53, 69, 0.1)', border: '1px solid #dc3545', padding: '0.8rem', borderRadius: '8px', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.85rem', color: '#f5f5f5' }}>Supprimer définitivement ce post ?</span>
+                                        <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>Supprimer définitivement ce post ?</span>
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                                             <button className="btn-primary" style={{ backgroundColor: '#333', padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={() => setIdPostEnSuppression(null)}>Annuler</button>
                                             <button className="btn-primary" style={{ backgroundColor: '#dc3545', padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={() => validerSuppressionInline(pub.ID)}>Supprimer</button>
@@ -1727,24 +1752,30 @@
 
                                 {pub.Media_URL && (
                                     <div style={{ marginBottom: '1rem', textAlign: 'center', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden' }}>
-                                        <img src={`../Backend/${pub.Media_URL}`} style={{ maxWidth: '100%', maxHeight: '400px', objectFit: 'contain' }} />
+                                        {pub.Media_URL.match(/\.(mp4|webm|ogg)$/i) ? (
+                                            <video controls style={{ maxWidth: '100%', maxHeight: '400px', display: 'block', margin: '0 auto' }}>
+                                                <source src={`../Backend/${pub.Media_URL}`} type={`video/${pub.Media_URL.split('.').pop()}`} />
+                                            </video>
+                                        ) : (
+                                            <img src={`../Backend/${pub.Media_URL}`} style={{ maxWidth: '100%', maxHeight: '400px', objectFit: 'contain' }} alt="Performance" />
+                                        )}
                                     </div>
                                 )}
 
-                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', borderTop: '1px solid #333', paddingTop: '1rem', flexWrap: 'wrap' }}>
-                                    <button className="btn-like" onClick={() => fetch("../Backend/liker_publication.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publication_id: pub.ID, utilisateur_id: utilisateurConnecte.ID }) }).then(() => chargerPublications())}>Respect {pub.NbLikes > 0 && `(${pub.NbLikes})`}</button>
-                                    <button className="btn-like" onClick={() => { if (commentairesOuverts === pub.ID) setCommentairesOuverts(null); else { setCommentairesOuverts(pub.ID); fetch(`../Backend/get_commentaires.php?pub_id=${pub.ID}`).then(res=>res.json()).then(d=>setListeCommentaires(d)); } }}>Commenter</button>
-                                    <button className="btn-like" style={{ borderColor: pubAPartager === pub.ID ? '#FF6B00' : '', color: pubAPartager === pub.ID ? '#FF6B00' : '' }} onClick={() => ouvrirPartage(pub)}>Partager</button>
+                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', flexWrap: 'wrap' }}>
+                                    <button className="btn-like" onClick={() => fetch("../Backend/liker_publication.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publication_id: pub.ID, utilisateur_id: utilisateurConnecte.ID }) }).then(() => chargerPublications())}>🔥 Respect {pub.NbLikes > 0 && `(${pub.NbLikes})`}</button>
+                                    <button className="btn-like" onClick={() => { if (commentairesOuverts === pub.ID) setCommentairesOuverts(null); else { setCommentairesOuverts(pub.ID); fetch(`../Backend/get_commentaires.php?pub_id=${pub.ID}`).then(res=>res.json()).then(d=>setListeCommentaires(d)); } }}>💬 Commenter</button>
+                                    <button className="btn-like" style={{ borderColor: pubAPartager === pub.ID ? 'var(--orange-primary)' : '', color: pubAPartager === pub.ID ? 'var(--orange-primary)' : '' }} onClick={() => ouvrirPartage(pub)}>🔗 Partager</button>
                                     {utilisateurConnecte && utilisateurConnecte.ID !== pub.Auteur_ID && (
-                                        <button className="btn-like" style={{ borderColor: idPostEnSignalement === pub.ID ? '#dc3545' : '', color: idPostEnSignalement === pub.ID ? '#dc3545' : '' }} onClick={() => ouvrirSignalement(pub)}>Signaler</button>
+                                        <button className="btn-like" style={{ borderColor: idPostEnSignalement === pub.ID ? '#dc3545' : '', color: idPostEnSignalement === pub.ID ? '#dc3545' : '' }} onClick={() => ouvrirSignalement(pub)}>⚠️ Signaler</button>
                                     )}
                                 </div>
 
                                 {pubAPartager === pub.ID && (
-                                    <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#1a1a1a', borderRadius: '8px', border: '1px solid #FF6B00' }}>
+                                    <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#1a1a1a', borderRadius: '8px', border: '1px solid var(--orange-primary)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
-                                            <strong style={{ color: '#FF6B00', fontSize: '0.9rem' }}>Partager cette performance :</strong>
-                                            <button onClick={() => setPubAPartager(null)} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer' }}>X</button>
+                                            <strong style={{ color: 'var(--orange-primary)', fontSize: '0.9rem' }}>Partager cette performance :</strong>
+                                            <button onClick={() => setPubAPartager(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>✖</button>
                                         </div>
                                         
                                         <div style={{ display: 'flex', marginBottom: '1rem' }}>
@@ -1752,14 +1783,14 @@
                                                 const url = window.location.origin + "/post/" + pub.ID;
                                                 navigator.clipboard.writeText(url);
                                                 alert("Lien copié dans le presse-papier !");
-                                            }}>Copier le lien</button>
+                                            }}>📋 Copier le lien</button>
                                         </div>
 
-                                        <div style={{ fontSize: '0.8rem', color: '#aaa', marginBottom: '0.5rem' }}>Ou envoyer en message interne :</div>
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Ou envoyer en message interne :</div>
                                         <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                                            {listeContacts.length === 0 ? <span style={{ color: '#aaa', fontSize: '0.85rem' }}>Aucun contact disponible.</span> : listeContacts.map(c => (
+                                            {listeContacts.length === 0 ? <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Aucun contact disponible.</span> : listeContacts.map(c => (
                                                 <button key={c.ID} onClick={() => envoyerPartage(c.ID, pub)} className="btn-like" style={{ whiteSpace: 'nowrap', backgroundColor: '#333' }}>
-                                                    {c.Nom}
+                                                    👤 {c.Nom}
                                                 </button>
                                             ))}
                                         </div>
@@ -1768,7 +1799,7 @@
 
                                 {idPostEnSignalement === pub.ID && (
                                     <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'rgba(220, 53, 69, 0.05)', borderRadius: '8px', border: '1px dashed #dc3545' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}><strong style={{ color: '#dc3545', fontSize: '0.9rem' }}>Signaler :</strong><button onClick={() => setIdPostEnSignalement(null)} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer' }}>X</button></div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}><strong style={{ color: '#dc3545', fontSize: '0.9rem' }}>Signaler :</strong><button onClick={() => setIdPostEnSignalement(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>✖</button></div>
                                         <textarea placeholder="Motif du signalement..." value={motifSignalement} onChange={(e) => setMotifSignalement(e.target.value)} rows="2" style={{ fontSize: '0.9rem', padding: '0.6rem', borderColor: '#dc3545' }} />
                                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
                                             <button className="btn-primary" style={{ backgroundColor: '#333', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setIdPostEnSignalement(null)}>Annuler</button>
