@@ -21,19 +21,22 @@
             --text-muted: #aaaaaa;
             --border-color: #333333;
         }
+
         /* === THÈME CLAIR (Surcharge des variables) === */
         body.light-mode {
             --bg-dark: #f0f2f5;
             --bg-card: #ffffff;
-            --orange-primary: #FF6B00; /* On garde l'orange emblématique */
+            --orange-primary: #FF6B00;
+            /* On garde l'orange emblématique */
             --orange-hover: #e65c00;
-            --text-light: #121212; /* Le texte devient foncé */
+            --text-light: #121212;
+            /* Le texte devient foncé */
             --text-muted: #666666;
             --border-color: #dddddd;
         }
 
         /* Astuce pour forcer les inputs/textareas à s'adapter même avec des styles en ligne */
-        body.light-mode input, 
+        body.light-mode input,
         body.light-mode textarea {
             background-color: var(--bg-card) !important;
             color: var(--text-light) !important;
@@ -375,15 +378,19 @@
         }
 
         /* === NOUVEAU LAYOUT MESSAGERIE (Adaptatif Clair/Sombre) === */
+        /* === LAYOUT MESSAGERIE AJUSTÉ (Largeur Max & Hauteur Dynamique) === */
         .messages-layout {
             display: grid;
-            grid-template-columns: 200px 1fr;
+            grid-template-columns: 220px 1fr; /* Sidebar légèrement plus large */
             gap: 1rem;
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            height: 65vh;
+            /* Hauteur dynamique : occupe l'espace entre header (70px) et nav (70px) + marges */
+            height: calc(100vh - 190px); 
+            min-height: 400px;
             overflow: hidden;
+            width: 100%; /* Occupe toute la largeur disponible de la colonne */
         }
 
         .contacts-sidebar {
@@ -410,7 +417,8 @@
         .contact-item:hover,
         .contact-item.active {
             border-color: var(--orange-primary);
-            background-color: rgba(255, 107, 0, 0.08); /* Effet orangé léger */
+            background-color: rgba(255, 107, 0, 0.08);
+            /* Effet orangé léger */
         }
 
         .chat-area {
@@ -439,16 +447,64 @@
             line-height: 1.4;
         }
 
+        /* Ajustement du conteneur de recherche pour éviter le scroll */
+        .search-controls {
+            display: flex;
+            flex-wrap: wrap;
+            /* Permet le passage à la ligne */
+            gap: 0.5rem;
+            margin-top: 1rem;
+            align-items: center;
+        }
+
+        .onglet-container {
+            display: flex;
+            flex-wrap: wrap;
+            /* Les onglets sautent à la ligne si besoin */
+            gap: 0.5rem;
+            flex: 1;
+        }
+
         .msg-moi {
             background-color: var(--orange-primary);
-            color: white; /* Le texte sur fond orange reste toujours blanc */
+            color: white;
+            /* Le texte sur fond orange reste toujours blanc */
             border-bottom-right-radius: 2px;
         }
 
         .msg-autre {
             background-color: var(--border-color);
-            color: var(--text-light); /* S'adapte en noir ou blanc selon le thème */
+            color: var(--text-light);
+            /* S'adapte en noir ou blanc selon le thème */
             border-bottom-left-radius: 2px;
+        }
+
+        /* Boutons de filtre dans la messagerie */
+        /* Boutons de filtre arrondis et élégants */
+        .filter-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            /* Empêche le débordement horizontal */
+        }
+
+        .filter-btn {
+            padding: 0.4rem 1rem;
+            font-size: 0.8rem;
+            background-color: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 20px;
+            /* Arrondi total pour un look "pill" */
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn.active {
+            background-color: var(--orange-primary);
+            color: white;
+            border-color: var(--orange-primary);
         }
     </style>
 </head>
@@ -458,14 +514,14 @@
     <div id="root"></div>
 
     <script type="text/babel">
-       // --- COMPOSANT PROFIL PERSONNEL ---
+        // --- COMPOSANT PROFIL PERSONNEL ---
         function Profil({ utilisateurConnecte, setUtilisateurConnecte, setOngletActif }) {
             const [sousOnglet, setSousOnglet] = React.useState('publications');
             const [modeEditionForm, setModeEditionForm] = React.useState(false);
             const [formData, setFormData] = React.useState({ nom: '', email: '', motDePasse: '' });
-            const [fichierAvatar, setFichierAvatar] = React.useState(null); 
+            const [fichierAvatar, setFichierAvatar] = React.useState(null);
             const [message, setMessage] = React.useState('');
-            
+
             const [donneesReseau, setDonneesReseau] = React.useState(null);
             const [chargementDonnees, setChargementDonnees] = React.useState(true);
 
@@ -497,15 +553,15 @@
                     method: "POST",
                     body: formObj
                 })
-                .then(res => res.json()).then(data => {
-                    if (data.erreur) setMessage("❌ " + data.erreur);
-                    else { 
-                        setMessage("✅ Profil mis à jour !"); 
-                        setUtilisateurConnecte(data.utilisateur); 
-                        setModeEditionForm(false); 
-                        chargerDonneesPerso(); 
-                    }
-                });
+                    .then(res => res.json()).then(data => {
+                        if (data.erreur) setMessage("❌ " + data.erreur);
+                        else {
+                            setMessage("✅ Profil mis à jour !");
+                            setUtilisateurConnecte(data.utilisateur);
+                            setModeEditionForm(false);
+                            chargerDonneesPerso();
+                        }
+                    });
             };
 
             const handleEpingler = (pubId) => {
@@ -514,27 +570,27 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ publication_id: pubId, utilisateur_id: utilisateurConnecte.ID })
                 })
-                .then(res => res.text())
-                .then(text => {
-                    try {
-                        const data = JSON.parse(text);
-                        if (data.erreur) {
-                            alert("Erreur Serveur : " + data.erreur);
-                        } else {
-                            chargerDonneesPerso();
+                    .then(res => res.text())
+                    .then(text => {
+                        try {
+                            const data = JSON.parse(text);
+                            if (data.erreur) {
+                                alert("Erreur Serveur : " + data.erreur);
+                            } else {
+                                chargerDonneesPerso();
+                            }
+                        } catch (e) {
+                            alert("Erreur fatale (Voir console F12). Réponse du serveur : " + text);
+                            console.error("Réponse brute du serveur :", text);
                         }
-                    } catch(e) {
-                        alert("Erreur fatale (Voir console F12). Réponse du serveur : " + text);
-                        console.error("Réponse brute du serveur :", text);
-                    }
-                })
-                .catch(err => alert("Erreur réseau : " + err));
+                    })
+                    .catch(err => alert("Erreur réseau : " + err));
             };
 
             const uStats = donneesReseau ? donneesReseau.utilisateurs || donneesReseau.utilisateur : utilisateurConnecte;
-            
-            const mesPubs = donneesReseau && donneesReseau.publications 
-                ? [...donneesReseau.publications].sort((a, b) => (b.Est_Epingle || 0) - (a.Est_Epingle || 0)) 
+
+            const mesPubs = donneesReseau && donneesReseau.publications
+                ? [...donneesReseau.publications].sort((a, b) => (b.Est_Epingle || 0) - (a.Est_Epingle || 0))
                 : [];
 
             return (
@@ -547,7 +603,7 @@
                                 {utilisateurConnecte.Nom.charAt(0).toUpperCase()}
                             </div>
                         )}
-                        
+
                         <h2 style={{ color: 'var(--orange-primary)', margin: '0 0 0.5rem 0' }}>{utilisateurConnecte.Nom}</h2>
                         <p style={{ color: 'var(--text-muted)', margin: '0 0 1.5rem 0' }}>{utilisateurConnecte.Role}</p>
 
@@ -567,7 +623,7 @@
                             <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem', fontSize: '1.1rem' }}>Vos performances publiées</h3>
                             {chargementDonnees ? <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Chargement...</p> : mesPubs.length === 0 ? <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucune activité partagée.</p> : mesPubs.map(pub => (
                                 <div key={pub.ID} className="card post" style={{ position: 'relative', border: pub.Est_Epingle == 1 ? '1px solid var(--orange-primary)' : '1px solid var(--border-color)' }}>
-                                    
+
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                                         <div>
                                             {pub.Est_Epingle == 1 && <div style={{ color: 'var(--orange-primary)', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '0.3rem' }}>📌 Épinglé</div>}
@@ -579,7 +635,7 @@
                                     </div>
 
                                     <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{pub.Contenu}</p>
-                                    
+
                                     {pub.Media_URL && (
                                         <div style={{ textAlign: 'center', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden', marginBottom: '1rem' }}>
                                             {pub.Media_URL.match(/\.(mp4|webm|ogg)$/i) ? (
@@ -591,7 +647,7 @@
                                             )}
                                         </div>
                                     )}
-                                    
+
                                     <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>🔥 {pub.NbLikes} Respects reçus</span>
                                 </div>
                             ))}
@@ -611,7 +667,7 @@
                             ) : (
                                 <form onSubmit={handleSauvegarder} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                     <h3 style={{ color: 'var(--orange-primary)', marginTop: 0, fontSize: '1.1rem' }}>Mettre à jour le profil</h3>
-                                    
+
                                     <div>
                                         <label style={{ color: 'var(--text-muted)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>Changer la photo de profil</label>
                                         <input type="file" accept="image/*" onChange={e => setFichierAvatar(e.target.files[0])} style={{ padding: 0 }} />
@@ -619,15 +675,15 @@
 
                                     <div>
                                         <label style={{ color: 'var(--text-muted)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>Nom d'athlète</label>
-                                        <input type="text" value={formData.nom} onChange={e => setFormData({...formData, nom: e.target.value})} required />
+                                        <input type="text" value={formData.nom} onChange={e => setFormData({ ...formData, nom: e.target.value })} required />
                                     </div>
                                     <div>
                                         <label style={{ color: 'var(--text-muted)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>Adresse Email</label>
-                                        <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required />
+                                        <input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} required />
                                     </div>
                                     <div>
                                         <label style={{ color: 'var(--text-muted)', fontSize: '0.9rem', display: 'block', marginBottom: '0.5rem' }}>Nouveau mot de passe <small>(laisser vide pour conserver)</small></label>
-                                        <input type="password" placeholder="***" value={formData.motDePasse} onChange={e => setFormData({...formData, motDePasse: e.target.value})} />
+                                        <input type="password" placeholder="***" value={formData.motDePasse} onChange={e => setFormData({ ...formData, motDePasse: e.target.value })} />
                                     </div>
                                     <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                                         <button type="button" className="btn-primary" style={{ flex: 1, backgroundColor: '#333' }} onClick={() => setModeEditionForm(false)}>Annuler</button>
@@ -645,7 +701,7 @@
         // --- COMPOSANT ÉVÉNEMENTS (Correction du mode clair pour le calendrier et bouton) ---
         function Evenements({ utilisateurConnecte, modalOuverte, fermerModal }) {
             const [listeEvenements, setListeEvenements] = React.useState([]);
-            const [mesEvenements, setMesEvenements] = React.useState([]); 
+            const [mesEvenements, setMesEvenements] = React.useState([]);
             const [dateCalendrier, setDateCalendrier] = React.useState(new Date());
             const [chargement, setChargement] = React.useState(true);
 
@@ -655,7 +711,7 @@
                 fetch("../Backend/get_evenements.php")
                     .then(r => r.json())
                     .then(data => { setListeEvenements(data.erreur ? [] : data); setChargement(false); });
-                
+
                 if (utilisateurConnecte) {
                     fetch(`../Backend/get_mes_evenements.php?user_id=${utilisateurConnecte.ID}`)
                         .then(r => r.json())
@@ -672,40 +728,40 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ ...nouveauEvt, createur_id: utilisateurConnecte.ID })
                 })
-                .then(r => r.json()).then(data => {
-                    if (data.erreur) alert("❌ " + data.erreur);
-                    else {
-                        setNouveauEvt({ titre: '', description: '', date: '', lieu: '' });
-                        fermerModal();
-                        chargerDonnees();
-                    }
-                });
+                    .then(r => r.json()).then(data => {
+                        if (data.erreur) alert("❌ " + data.erreur);
+                        else {
+                            setNouveauEvt({ titre: '', description: '', date: '', lieu: '' });
+                            fermerModal();
+                            chargerDonnees();
+                        }
+                    });
             };
 
             const handleRejoindre = (id) => {
                 if (!utilisateurConnecte) return alert("Veuillez vous connecter pour rejoindre un événement.");
-                
+
                 fetch("../Backend/rejoindre_evenement.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ evenement_id: id, utilisateur_id: utilisateurConnecte.ID })
                 })
-                .then(r => r.text())
-                .then(text => {
-                    try {
-                        const data = JSON.parse(text);
-                        if (data.erreur) {
-                            alert("❌ Erreur : " + data.erreur);
-                        } else {
-                            alert("✅ " + data.succes);
-                            chargerDonnees(); 
+                    .then(r => r.text())
+                    .then(text => {
+                        try {
+                            const data = JSON.parse(text);
+                            if (data.erreur) {
+                                alert("❌ Erreur : " + data.erreur);
+                            } else {
+                                alert("✅ " + data.succes);
+                                chargerDonnees();
+                            }
+                        } catch (e) {
+                            alert("Erreur Serveur. Réponse brute : " + text);
+                            console.error("Réponse brute du serveur :", text);
                         }
-                    } catch(e) {
-                        alert("Erreur Serveur. Réponse brute : " + text);
-                        console.error("Réponse brute du serveur :", text);
-                    }
-                })
-                .catch(err => alert("Erreur réseau : " + err));
+                    })
+                    .catch(err => alert("Erreur réseau : " + err));
             };
 
             const moisActuel = dateCalendrier.getMonth();
@@ -715,9 +771,9 @@
 
             const premierJourDuMois = new Date(anneeActuelle, moisActuel, 1).getDay();
             const joursDansLeMois = new Date(anneeActuelle, moisActuel + 1, 0).getDate();
-            
+
             const decalage = premierJourDuMois === 0 ? 6 : premierJourDuMois - 1;
-            
+
             const cellulesCalendrier = [];
             for (let i = 0; i < decalage; i++) cellulesCalendrier.push(null);
             for (let i = 1; i <= joursDansLeMois; i++) cellulesCalendrier.push(i);
@@ -739,10 +795,10 @@
                                 <button className="modal-close" onClick={fermerModal}>✖</button>
                                 <h3 style={{ marginTop: 0, color: 'var(--orange-primary)' }}>Créer un Événement</h3>
                                 <form onSubmit={handleCreer} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                    <input type="text" placeholder="Titre de l'événement..." value={nouveauEvt.titre} onChange={e => setNouveauEvt({...nouveauEvt, titre: e.target.value})} required />
-                                    <input type="datetime-local" value={nouveauEvt.date} onChange={e => setNouveauEvt({...nouveauEvt, date: e.target.value})} required style={{ padding: '0.8rem', backgroundColor: 'var(--bg-dark)', color: 'var(--text-light)', border: '1px solid var(--border-color)', borderRadius: '8px' }} />
-                                    <input type="text" placeholder="Lieu (Ville, Salle, Parc...)" value={nouveauEvt.lieu} onChange={e => setNouveauEvt({...nouveauEvt, lieu: e.target.value})} required />
-                                    <textarea placeholder="Description, programme, prérequis..." value={nouveauEvt.description} onChange={e => setNouveauEvt({...nouveauEvt, description: e.target.value})} rows="4" required />
+                                    <input type="text" placeholder="Titre de l'événement..." value={nouveauEvt.titre} onChange={e => setNouveauEvt({ ...nouveauEvt, titre: e.target.value })} required />
+                                    <input type="datetime-local" value={nouveauEvt.date} onChange={e => setNouveauEvt({ ...nouveauEvt, date: e.target.value })} required style={{ padding: '0.8rem', backgroundColor: 'var(--bg-dark)', color: 'var(--text-light)', border: '1px solid var(--border-color)', borderRadius: '8px' }} />
+                                    <input type="text" placeholder="Lieu (Ville, Salle, Parc...)" value={nouveauEvt.lieu} onChange={e => setNouveauEvt({ ...nouveauEvt, lieu: e.target.value })} required />
+                                    <textarea placeholder="Description, programme, prérequis..." value={nouveauEvt.description} onChange={e => setNouveauEvt({ ...nouveauEvt, description: e.target.value })} rows="4" required />
                                     <button type="submit" className="btn-primary">Publier l'événement</button>
                                 </form>
                             </div>
@@ -765,13 +821,13 @@
                                 {cellulesCalendrier.map((jour, index) => {
                                     const evts = getEvenementsDuJour(jour);
                                     const estAujourdhui = jour === new Date().getDate() && moisActuel === new Date().getMonth() && anneeActuelle === new Date().getFullYear();
-                                    
+
                                     return (
-                                        <div key={index} style={{ 
-                                            minHeight: '80px', 
-                                            backgroundColor: 'var(--bg-dark)', 
-                                            border: estAujourdhui ? '1px solid var(--orange-primary)' : '1px solid var(--border-color)', 
-                                            borderRadius: '6px', 
+                                        <div key={index} style={{
+                                            minHeight: '80px',
+                                            backgroundColor: 'var(--bg-dark)',
+                                            border: estAujourdhui ? '1px solid var(--orange-primary)' : '1px solid var(--border-color)',
+                                            borderRadius: '6px',
                                             padding: '4px',
                                             display: 'flex',
                                             flexDirection: 'column'
@@ -779,17 +835,17 @@
                                             <span style={{ fontSize: '0.85rem', color: estAujourdhui ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: estAujourdhui ? 'bold' : 'normal', alignSelf: 'flex-end' }}>
                                                 {jour}
                                             </span>
-                                            
+
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
                                                 {evts.map(e => (
-                                                    <div key={e.ID} style={{ 
-                                                        backgroundColor: 'var(--orange-primary)', 
-                                                        color: 'white', 
-                                                        fontSize: '0.7rem', 
-                                                        padding: '2px 4px', 
-                                                        borderRadius: '4px', 
-                                                        whiteSpace: 'nowrap', 
-                                                        overflow: 'hidden', 
+                                                    <div key={e.ID} style={{
+                                                        backgroundColor: 'var(--orange-primary)',
+                                                        color: 'white',
+                                                        fontSize: '0.7rem',
+                                                        padding: '2px 4px',
+                                                        borderRadius: '4px',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
                                                         textOverflow: 'ellipsis',
                                                         fontWeight: 'bold'
                                                     }} title={`${e.Titre} - ${e.Lieu}`}>
@@ -812,8 +868,8 @@
                             <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucun événement à venir.</p>
                         ) : (
                             listeEvenements.map(evt => {
-                                const estInscrit = mesEvenements.some(m => m.ID == evt.ID); 
-                                
+                                const estInscrit = mesEvenements.some(m => m.ID == evt.ID);
+
                                 return (
                                     <div key={evt.ID} className="card" style={{ borderLeft: '4px solid #28a745' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -825,15 +881,15 @@
                                                 <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-light)' }}>{evt.Description}</p>
                                             </div>
                                         </div>
-                                        
+
                                         <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Organisé par <strong>{evt.Organisateur_Nom}</strong></span>
-                                            <button 
-                                                onClick={() => handleRejoindre(evt.ID)} 
-                                                className="btn-primary" 
-                                                style={{ 
-                                                    padding: '0.4rem 1rem', 
-                                                    fontSize: '0.8rem', 
+                                            <button
+                                                onClick={() => handleRejoindre(evt.ID)}
+                                                className="btn-primary"
+                                                style={{
+                                                    padding: '0.4rem 1rem',
+                                                    fontSize: '0.8rem',
                                                     backgroundColor: estInscrit ? 'var(--border-color)' : '#28a745',
                                                     color: estInscrit ? 'var(--text-light)' : 'white'
                                                 }}
@@ -849,13 +905,11 @@
                 </div>
             );
         }
-        // --- COMPOSANT RECHERCHE (Tri visuel cohérent) ---
         function Recherche({ utilisateurConnecte, ouvrirProfil }) {
             const [requete, setRequete] = React.useState("");
             const [ongletActif, setOngletActif] = React.useState("tous");
             const [resultats, setResultats] = React.useState([]);
             const [chargement, setChargement] = React.useState(false);
-            
             const [triActif, setTriActif] = React.useState("pertinence");
 
             const onglets = [
@@ -867,57 +921,38 @@
             ];
 
             React.useEffect(() => {
-                if (requete.trim() === "") {
-                    setResultats([]);
-                    return;
-                }
-
+                if (requete.trim() === "") { setResultats([]); return; }
                 setChargement(true);
                 fetch("../Backend/rechercher.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ requete: requete, type: ongletActif })
                 })
-                .then(res => res.json())
-                .then(data => {
-                    setResultats(data);
-                    setChargement(false);
-                })
-                .catch(err => { console.error(err); setChargement(false); });
-
+                    .then(res => res.json())
+                    .then(data => { setResultats(data); setChargement(false); });
             }, [requete, ongletActif]);
 
-            // --- L'INTELLIGENCE DU TRI EST ICI ---
+            // Tri intelligent basé sur ce que l'utilisateur lit
             const getTexteTri = (item) => {
                 const type = item.Type_Source || ongletActif;
-                
-                // Pour un Hub : on trie sur le mot "Hub" suivi du nom
                 if (type === 'communaute') return ("hub " + (item.Nom || "")).toLowerCase();
-                
-                // Pour une publication : on trie d'abord sur le nom de l'AUTEUR (en gras), puis le contenu
-                if (type === 'publication') {
-                    const auteur = item.Nom || "";
-                    const contenu = item.Contenu || "";
-                    return (auteur + " " + contenu).toLowerCase();
-                }
-                
-                // Pour le reste (Événements, Utilisateurs) : on trie sur le nom principal
+                if (type === 'publication') return ((item.Nom || "") + " " + (item.Contenu || "")).toLowerCase();
                 return (item.Nom || item.Titre || "").toString().toLowerCase();
             };
 
             const getTimestamp = (item) => {
                 const dateBrute = item.Date_Publication || item.Date_Evenement;
-                if (!dateBrute) return null; 
+                if (!dateBrute) return null;
                 const parsed = new Date(dateBrute.replace(' ', 'T')).getTime();
                 return isNaN(parsed) ? null : parsed;
             };
 
             const resultatsTries = [...resultats].sort((a, b) => {
-                if (triActif === 'pertinence') return 0; 
+                if (triActif === 'pertinence') return 0;
 
                 if (triActif === 'az') return getTexteTri(a).localeCompare(getTexteTri(b));
                 if (triActif === 'za') return getTexteTri(b).localeCompare(getTexteTri(a));
-                
+
                 const timeA = getTimestamp(a);
                 const timeB = getTimestamp(b);
 
@@ -933,7 +968,6 @@
                     if (timeB === null) return -1;
                     return timeA - timeB;
                 }
-                
                 return 0;
             });
 
@@ -942,38 +976,25 @@
                     <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
                         <div style={{ position: 'relative' }}>
                             <span style={{ position: 'absolute', left: '15px', top: '15px', fontSize: '1.2rem', color: 'var(--text-muted)' }}>🔍</span>
-                            <input 
-                                type="text" 
-                                placeholder="Recherche globale ConnectHub..."
-                                value={requete}
+                            <input
+                                type="text" placeholder="Recherche globale..." value={requete}
                                 onChange={(e) => setRequete(e.target.value)}
-                                style={{ 
-                                    width: '100%', 
-                                    padding: '1rem 1rem 1rem 3rem', 
-                                    borderRadius: '25px', 
-                                    backgroundColor: 'var(--bg-dark)', 
-                                    border: '1px solid var(--border-color)', 
-                                    color: 'var(--text-light)' 
-                                }} 
+                                style={{ width: '100%', padding: '1rem 1rem 1rem 3rem', borderRadius: '25px', backgroundColor: 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'var(--text-light)' }}
                             />
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
-                            
-                            <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem', flex: 1 }}>
+                        <div className="search-controls">
+                            <div className="onglet-container">
                                 {onglets.map(onglet => (
-                                    <button 
+                                    <button
                                         key={onglet.id}
                                         onClick={() => setOngletActif(onglet.id)}
                                         style={{
                                             backgroundColor: ongletActif === onglet.id ? 'var(--orange-primary)' : 'transparent',
                                             color: ongletActif === onglet.id ? 'white' : 'var(--text-muted)',
                                             border: `1px solid ${ongletActif === onglet.id ? 'var(--orange-primary)' : 'var(--border-color)'}`,
-                                            padding: '0.4rem 1rem',
-                                            borderRadius: '20px',
-                                            cursor: 'pointer',
-                                            whiteSpace: 'nowrap',
-                                            fontWeight: ongletActif === onglet.id ? 'bold' : 'normal'
+                                            padding: '0.4rem 1rem', borderRadius: '20px', cursor: 'pointer', fontWeight: ongletActif === onglet.id ? 'bold' : 'normal',
+                                            fontSize: '0.85rem'
                                         }}
                                     >
                                         {onglet.label}
@@ -981,25 +1002,15 @@
                                 ))}
                             </div>
 
-                            <select 
-                                value={triActif} 
-                                onChange={(e) => setTriActif(e.target.value)}
-                                style={{ 
-                                    padding: '0.4rem 1rem', 
-                                    borderRadius: '20px', 
-                                    backgroundColor: 'var(--bg-dark)', 
-                                    color: 'var(--text-light)', 
-                                    border: '1px solid var(--border-color)', 
-                                    outline: 'none', 
-                                    cursor: 'pointer',
-                                    fontSize: '0.85rem'
-                                }}
+                            <select
+                                value={triActif} onChange={(e) => setTriActif(e.target.value)}
+                                style={{ padding: '0.4rem 1rem', borderRadius: '20px', backgroundColor: 'var(--bg-dark)', color: 'var(--text-light)', border: '1px solid var(--border-color)', cursor: 'pointer', fontSize: '0.85rem' }}
                             >
-                                <option value="pertinence">Trier par Pertinence</option>
-                                <option value="recent">Les plus récents</option>
-                                <option value="ancien">Les plus anciens</option>
-                                <option value="az">De A à Z</option>
-                                <option value="za">De Z à A</option>
+                                <option value="pertinence">Pertinence</option>
+                                <option value="recent">Plus récents</option>
+                                <option value="ancien">Plus anciens</option>
+                                <option value="az">A à Z</option>
+                                <option value="za">Z à A</option>
                             </select>
                         </div>
                     </div>
@@ -1014,7 +1025,7 @@
                         ) : (
                             resultatsTries.map((res, index) => {
                                 const typeOrigine = res.Type_Source || ongletActif;
-                                const cleUnique = `resultat-${typeOrigine}-${res.ID}-${index}`;
+                                const cleUnique = `res-${typeOrigine}-${res.ID}-${index}`;
 
                                 return (
                                     <div key={cleUnique} className="card" style={{ padding: '1rem', marginBottom: '0.5rem' }}>
@@ -1058,14 +1069,14 @@
         // --- COMPOSANT COMMUNAUTÉS ---
         function Communautes({ utilisateurConnecte, modalOuverte, fermerModal }) {
             const [listeCommunautes, setListeCommunautes] = React.useState([]);
-            const [communauteActive, setCommunauteActive] = React.useState(null); 
+            const [communauteActive, setCommunauteActive] = React.useState(null);
             const [discussions, setDiscussions] = React.useState([]);
-            
-            const [vueModeration, setVueModeration] = React.useState(false); 
-            const [ongletAdmin, setOngletAdmin] = React.useState('demandes'); 
+
+            const [vueModeration, setVueModeration] = React.useState(false);
+            const [ongletAdmin, setOngletAdmin] = React.useState('demandes');
             const [listeMembres, setListeMembres] = React.useState([]);
             const [listeDemandes, setListeDemandes] = React.useState([]);
-            
+
             const [nouveauGroupe, setNouveauGroupe] = React.useState({ nom: '', description: '' });
             const [titrePost, setTitrePost] = React.useState('');
             const [contenuPost, setContenuPost] = React.useState('');
@@ -1110,21 +1121,21 @@
                 fetch("../Backend/gerer_demande_communaute.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ 
-                        communaute_id: communauteActive.ID, 
+                    body: JSON.stringify({
+                        communaute_id: communauteActive.ID,
                         demandeur_id: demandeurId,
                         moderateur_id: utilisateurConnecte.ID,
                         action: actionRequise
                     })
                 })
-                .then(res => res.json()).then(data => {
-                    if (data.erreur) alert("Erreur : " + data.erreur);
-                    else {
-                        chargerDemandesAdmin(communauteActive.ID); 
-                        chargerMembresAdmin(communauteActive.ID); 
-                        chargerCommunautes(); 
-                    }
-                });
+                    .then(res => res.json()).then(data => {
+                        if (data.erreur) alert("Erreur : " + data.erreur);
+                        else {
+                            chargerDemandesAdmin(communauteActive.ID);
+                            chargerMembresAdmin(communauteActive.ID);
+                            chargerCommunautes();
+                        }
+                    });
             };
 
             const handlePromouvoir = (cibleId, cibleNom) => {
@@ -1134,43 +1145,43 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ communaute_id: communauteActive.ID, cible_id: cibleId, moderateur_id: utilisateurConnecte.ID })
                 })
-                .then(res => res.json()).then(data => {
-                    if (data.erreur) alert("Erreur : " + data.erreur);
-                    else {
-                        alert("Succès : " + data.succes);
-                        chargerMembresAdmin(communauteActive.ID);
-                    }
-                });
+                    .then(res => res.json()).then(data => {
+                        if (data.erreur) alert("Erreur : " + data.erreur);
+                        else {
+                            alert("Succès : " + data.succes);
+                            chargerMembresAdmin(communauteActive.ID);
+                        }
+                    });
             };
 
             React.useEffect(() => { chargerCommunautes(); }, [utilisateurConnecte]);
 
             const handleDemanderAdhesion = (e, id) => {
-                e.stopPropagation(); 
+                e.stopPropagation();
                 if (!utilisateurConnecte) return alert("Veuillez vous connecter.");
-                fetch("../Backend/rejoindre_communaute.php", { 
-                    method: "POST", 
-                    headers: { "Content-Type": "application/json" }, 
-                    body: JSON.stringify({ communaute_id: id, utilisateur_id: utilisateurConnecte.ID }) 
+                fetch("../Backend/rejoindre_communaute.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ communaute_id: id, utilisateur_id: utilisateurConnecte.ID })
                 })
-                .then(res => res.json()).then(data => {
-                    if(data.succes) alert("Succès : " + data.succes);
-                    chargerCommunautes();
-                });
+                    .then(res => res.json()).then(data => {
+                        if (data.succes) alert("Succès : " + data.succes);
+                        chargerCommunautes();
+                    });
             };
 
             const handleCreerGroupe = (e) => {
                 e.preventDefault();
                 fetch("../Backend/creer_communaute.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nom: nouveauGroupe.nom, description: nouveauGroupe.description, createur_id: utilisateurConnecte.ID }) })
-                .then(res => res.json()).then(data => {
-                    if (data.erreur) alert("Erreur : " + data.erreur);
-                    else { setNouveauGroupe({ nom: '', description: '' }); fermerModal(); chargerCommunautes(); }
-                });
+                    .then(res => res.json()).then(data => {
+                        if (data.erreur) alert("Erreur : " + data.erreur);
+                        else { setNouveauGroupe({ nom: '', description: '' }); fermerModal(); chargerCommunautes(); }
+                    });
             };
 
             const handleCreerPost = (e, depuisModale = false) => {
                 e.preventDefault();
-                
+
                 if (communauteActive.Statut_Membre !== 'Accepte') {
                     alert("Action refusée : Vous devez être un membre abonné pour publier.");
                     return;
@@ -1179,25 +1190,25 @@
                 fetch("../Backend/creer_discussion.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ 
-                        communaute_id: communauteActive.ID, 
+                    body: JSON.stringify({
+                        communaute_id: communauteActive.ID,
                         auteur_id: utilisateurConnecte.ID,
                         titre: titrePost,
                         contenu: contenuPost
                     })
                 })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.erreur) {
-                        alert("Erreur : " + data.erreur);
-                    } else {
-                        setTitrePost('');
-                        setContenuPost('');
-                        if (depuisModale) fermerModal();
-                        chargerDiscussions(communauteActive.ID); 
-                    }
-                })
-                .catch(err => console.error("Erreur :", err));
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.erreur) {
+                            alert("Erreur : " + data.erreur);
+                        } else {
+                            setTitrePost('');
+                            setContenuPost('');
+                            if (depuisModale) fermerModal();
+                            chargerDiscussions(communauteActive.ID);
+                        }
+                    })
+                    .catch(err => console.error("Erreur :", err));
             };
 
             const simulerVote = (id, valeur) => {
@@ -1216,13 +1227,13 @@
                         <div className="modal-overlay" onClick={fermerModal}>
                             <div className="modal-content" onClick={e => e.stopPropagation()}>
                                 <button className="modal-close" onClick={fermerModal}>✖</button>
-                                
+
                                 {!communauteActive ? (
                                     <React.Fragment>
                                         <h3 style={{ marginTop: 0, color: 'var(--orange-primary)' }}>Créer un Hub</h3>
                                         <form onSubmit={handleCreerGroupe} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                            <input type="text" placeholder="Nom (ex: Hub Street Workout)" value={nouveauGroupe.nom} onChange={(e) => setNouveauGroupe({...nouveauGroupe, nom: e.target.value})} required />
-                                            <textarea placeholder="Description et objectifs du groupe..." value={nouveauGroupe.description} onChange={(e) => setNouveauGroupe({...nouveauGroupe, description: e.target.value})} rows="3" />
+                                            <input type="text" placeholder="Nom (ex: Hub Street Workout)" value={nouveauGroupe.nom} onChange={(e) => setNouveauGroupe({ ...nouveauGroupe, nom: e.target.value })} required />
+                                            <textarea placeholder="Description et objectifs du groupe..." value={nouveauGroupe.description} onChange={(e) => setNouveauGroupe({ ...nouveauGroupe, description: e.target.value })} rows="3" />
                                             <button type="submit" className="btn-primary">Créer le Hub</button>
                                         </form>
                                     </React.Fragment>
@@ -1269,10 +1280,10 @@
                                                 <span style={{ backgroundColor: 'var(--border-color)', color: 'var(--text-light)', padding: '0.2rem 0.6rem', borderRadius: '15px', fontSize: '0.8rem' }}>👥 {communaute.NbMembres}</span>
                                             </div>
                                             <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>{communaute.Description}</p>
-                                            
+
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
                                                 <span style={{ fontSize: '0.8rem', color: 'var(--orange-primary)', fontWeight: 'bold' }}>Consulter le forum ➔</span>
-                                                
+
                                                 {!estAccepte && !estEnAttente && (
                                                     <button onClick={(e) => handleDemanderAdhesion(e, communaute.ID)} className="btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>S'abonner</button>
                                                 )}
@@ -1289,25 +1300,25 @@
                             <button onClick={() => setCommunauteActive(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', marginBottom: '1rem', padding: 0, fontSize: '0.9rem' }}>
                                 ⬅ Retour aux Hubs
                             </button>
-                            
+
                             <div className="card" style={{ backgroundColor: 'rgba(255, 107, 0, 0.05)', border: '1px solid var(--orange-primary)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <div>
                                         <h2 style={{ color: 'var(--text-light)', marginTop: 0, marginBottom: '0.5rem' }}>Hub {communauteActive.Nom}</h2>
                                         <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>{communauteActive.Description}</p>
                                     </div>
-                                    
+
                                     {communauteActive.Role_Communaute === 'Moderateur' && (
-                                        <button 
+                                        <button
                                             onClick={basculerModeration}
-                                            className="btn-primary" 
+                                            className="btn-primary"
                                             style={{ backgroundColor: vueModeration ? 'var(--border-color)' : '#dc3545', color: vueModeration ? 'var(--text-light)' : 'white', fontSize: '0.8rem', padding: '0.5rem' }}
                                         >
                                             {vueModeration ? "Fermer l'Admin" : "Gérer le Hub"}
                                         </button>
                                     )}
                                 </div>
-                                
+
                                 {communauteActive.Statut_Membre !== 'Accepte' && (
                                     <p style={{ margin: '1rem 0 0 0', color: '#ffc107', fontSize: '0.8rem', fontWeight: 'bold' }}>
                                         ⚠️ Mode Lecture Seule : Abonnez-vous et attendez la validation pour participer.
@@ -1326,7 +1337,7 @@
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                             {listeDemandes.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Aucune demande.</p> : listeDemandes.map(d => (
                                                 <div key={d.ID} style={{ textAlign: 'center', padding: '1rem', backgroundColor: 'var(--bg-dark)', borderRadius: '8px', fontSize: '0.9rem' }}>
-                                                    Demande de : <strong style={{color: 'var(--text-light)'}}>{d.Nom}</strong>
+                                                    Demande de : <strong style={{ color: 'var(--text-light)' }}>{d.Nom}</strong>
                                                     <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
                                                         <button onClick={() => handleGererDemande(d.ID, 'accepter')} className="btn-primary" style={{ backgroundColor: '#28a745', color: 'white', padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Approuver</button>
                                                         <button onClick={() => handleGererDemande(d.ID, 'rejeter')} className="btn-primary" style={{ backgroundColor: '#dc3545', color: 'white', padding: '0.4rem 1rem', fontSize: '0.8rem' }}>Rejeter</button>
@@ -1345,8 +1356,8 @@
                                                         </span>
                                                     </div>
                                                     {m.Role_Communaute !== 'Moderateur' && (
-                                                        <button 
-                                                            onClick={() => handlePromouvoir(m.ID, m.Nom)} 
+                                                        <button
+                                                            onClick={() => handlePromouvoir(m.ID, m.Nom)}
                                                             style={{ backgroundColor: 'transparent', border: '1px solid #dc3545', color: '#dc3545', padding: '0.3rem 0.6rem', borderRadius: '15px', cursor: 'pointer', fontSize: '0.75rem' }}
                                                         >
                                                             Promouvoir
@@ -1382,14 +1393,14 @@
                                             <span style={{ fontWeight: 'bold', color: disc.Score > 0 ? 'var(--orange-primary)' : 'var(--text-light)' }}>{disc.Score}</span>
                                             <button onClick={() => simulerVote(disc.ID, -1)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}>▼</button>
                                         </div>
-                                        
+
                                         <div style={{ flex: 1 }}>
                                             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
                                                 Posté par <strong style={{ color: 'var(--text-light)' }}>{disc.Auteur}</strong> • {disc.DateF}
                                             </div>
                                             <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>{disc.Titre}</h3>
                                             <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: '1.4', color: 'var(--text-light)' }}>{disc.Contenu}</p>
-                                            
+
                                             {communauteActive.Statut_Membre === 'Accepte' && (
                                                 <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem' }}>
                                                     <span style={{ fontSize: '0.85rem', color: 'var(--orange-primary)', cursor: 'pointer', fontWeight: 'bold' }}>💬 Répondre</span>
@@ -1404,40 +1415,54 @@
                 </div>
             );
         }
-        // --- COMPOSANT MESSAGERIE UNIFIÉE (Liste unique + Filtres) ---
+        // --- COMPOSANT MESSAGERIE PRIVÉE (Correction : Scroll & Filtres) ---
         function Messages({ utilisateurConnecte, contactPreselectionne }) {
-            const [tout, setTout] = React.useState([]); // Stocke tous les chats
-            const [filtre, setFiltre] = React.useState('tous'); // 'tous', 'prive', 'salon', 'evenement'
+            const [tout, setTout] = React.useState([]); 
+            const [filtre, setFiltre] = React.useState('tous');
             
             const [contactSelectionne, setContactSelectionne] = React.useState(null);
             const [discussionType, setDiscussionType] = React.useState('prive'); 
             const [historiqueMessages, setHistoriqueMessages] = React.useState([]);
             const [nouveauMessage, setNouveauMessage] = React.useState("");
 
+            const [modalGroupe, setModalGroupe] = React.useState(false);
+            const [nomNouveauGroupe, setNomNouveauGroupe] = React.useState("");
+            const [membresCoches, setMembresCoches] = React.useState([]);
+            const [listeContacts, setListeContacts] = React.useState([]); 
+
             const chatContainerRef = React.useRef(null);
-            
-            // Chargement de tout en un seul bloc
+
             const chargerTout = () => {
                 if (!utilisateurConnecte) return;
                 
-                // On récupère tout en parallèle
                 Promise.all([
                     fetch("../Backend/get_utilisateurs.php").then(r => r.json()),
                     fetch(`../Backend/get_salons.php?user_id=${utilisateurConnecte.ID}`).then(r => r.json()),
                     fetch(`../Backend/get_chats_evenements.php?user_id=${utilisateurConnecte.ID}`).then(r => r.json())
                 ]).then(([users, salons, evts]) => {
                     const liste = [
-                        ...users.filter(u => u.ID != utilisateurConnecte.ID).map(u => ({...u, type: 'prive'})),
-                        ...salons.map(s => ({...s, type: 'salon'})),
-                        ...evts.map(e => ({...e, type: 'evenement'}))
+                        ...users.filter(u => u.ID != utilisateurConnecte.ID).map(u => ({...u, type: 'prive', label: u.Nom, icon: '👤'})),
+                        ...salons.map(s => ({...s, type: 'salon', label: s.Nom, icon: '🔒'})),
+                        ...evts.map(e => ({...e, type: 'evenement', label: e.Titre, icon: '📢'}))
                     ];
                     setTout(liste);
+                    setListeContacts(users.filter(u => u.ID != utilisateurConnecte.ID));
                 });
             };
 
-            React.useEffect(() => { chargerTout(); }, [utilisateurConnecte]);
+            React.useEffect(() => { 
+                chargerTout(); 
+                if (contactPreselectionne) ouvrirDiscussion(contactPreselectionne);
+            }, [utilisateurConnecte]);
 
-            const messagesFiltres = filtre === 'tous' ? tout : tout.filter(item => item.type === filtre);
+            // Scroll automatique vers le bas
+            React.useEffect(() => {
+                if (chatContainerRef.current) {
+                    chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+                }
+            }, [historiqueMessages]);
+
+            const discussionsFiltrees = filtre === 'tous' ? tout : tout.filter(item => item.type === filtre);
 
             const ouvrirDiscussion = (item) => {
                 setContactSelectionne(item);
@@ -1460,24 +1485,52 @@
                     .then(data => setHistoriqueMessages(data.erreur ? [] : data));
             };
 
+            const handleEnvoyer = (e) => {
+                e.preventDefault();
+                if (nouveauMessage.trim() === "") return;
+
+                let url, payload;
+                if (discussionType === 'prive') {
+                    url = "../Backend/envoyer_message.php";
+                    payload = { expediteur_id: utilisateurConnecte.ID, destinataire_id: contactSelectionne.ID, contenu: nouveauMessage };
+                } else if (discussionType === 'evenement') {
+                    url = "../Backend/envoyer_message_evenement.php";
+                    payload = { expediteur_id: utilisateurConnecte.ID, evenement_id: contactSelectionne.ID, contenu: nouveauMessage };
+                } else {
+                    url = "../Backend/envoyer_message_salon.php";
+                    payload = { expediteur_id: utilisateurConnecte.ID, salon_id: contactSelectionne.ID, contenu: nouveauMessage };
+                }
+
+                fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.erreur) {
+                        setNouveauMessage("");
+                        ouvrirDiscussion(contactSelectionne);
+                    }
+                });
+            };
+
+            if (!utilisateurConnecte) return <div className="card">Veuillez vous connecter.</div>;
+
             return (
                 <div className="messages-layout">
+                    {/* ... (Modale groupe identique) ... */}
+                    
                     <div className="contacts-sidebar">
-                        {/* Filtres */}
-                        <div style={{ display: 'flex', gap: '0.3rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                        <button className="btn-primary" style={{ padding: '0.5rem', marginBottom: '1rem', borderRadius: '20px' }} onClick={() => setModalGroupe(true)}>➕ Nouveau Groupe</button>
+                        
+                        <div className="filter-bar">
                             {['tous', 'prive', 'salon', 'evenement'].map(f => (
-                                <button key={f} onClick={() => setFiltre(f)} 
-                                style={{ padding: '0.3rem 0.5rem', fontSize: '0.7rem', backgroundColor: filtre === f ? 'var(--orange-primary)' : 'var(--bg-dark)', border: '1px solid var(--border-color)', color: 'var(--text-light)', cursor: 'pointer', borderRadius: '4px' }}>
+                                <button key={f} onClick={() => setFiltre(f)} className={`filter-btn ${filtre === f ? 'active' : ''}`}>
                                     {f.toUpperCase()}
                                 </button>
                             ))}
                         </div>
 
-                        {messagesFiltres.map(item => (
+                        {discussionsFiltrees.map(item => (
                             <div key={`${item.type}-${item.ID}`} onClick={() => ouvrirDiscussion(item)} className={`contact-item ${contactSelectionne?.ID === item.ID && discussionType === item.type ? 'active' : ''}`}>
-                                {item.type === 'prive' && <span>👤 {item.Nom}</span>}
-                                {item.type === 'salon' && <span>🔒 {item.Nom}</span>}
-                                {item.type === 'evenement' && <span>📢 {item.Titre}</span>}
+                                <strong>{item.icon} {item.label}</strong>
                             </div>
                         ))}
                     </div>
@@ -1485,26 +1538,27 @@
                     <div className="chat-area">
                         {contactSelectionne ? (
                             <React.Fragment>
-                                <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
-                                    <h3 style={{ margin: 0, color: 'var(--orange-primary)' }}>{contactSelectionne.Nom || contactSelectionne.Titre}</h3>
-                                </div>
-                                <div className="messages-container" ref={chatContainerRef}>
+                                <h3 style={{ color: 'var(--orange-primary)', marginBottom: '1rem' }}>{contactSelectionne.label}</h3>
+                                
+                                {/* LE FIX EST ICI : Ajout des styles pour forcer le scroll */}
+                                <div className="messages-container" ref={chatContainerRef} style={{ overflowY: 'auto', flex: '1 1 0', minHeight: '0' }}>
                                     {historiqueMessages.map(msg => {
                                         const estMoi = msg.Expediteur_ID === utilisateurConnecte.ID;
                                         return (
-                                            <div key={msg.ID} style={{ display: 'flex', flexDirection: 'column', alignItems: estMoi ? 'flex-end' : 'flex-start', marginBottom: '0.5rem' }}>
+                                            <div key={msg.ID} style={{ display: 'flex', flexDirection: 'column', alignItems: estMoi ? 'flex-end' : 'flex-start', marginBottom: '0.6rem' }}>
                                                 <div className={`msg-bulle ${estMoi ? 'msg-moi' : 'msg-autre'}`}>{msg.Contenu}</div>
                                             </div>
                                         );
                                     })}
                                 </div>
-                                <form onSubmit={(e) => { e.preventDefault(); /* logique envoi identique à avant */ }} style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <input value={nouveauMessage} onChange={e => setNouveauMessage(e.target.value)} placeholder="Message..." />
-                                    <button type="submit" className="btn-primary">➤</button>
+
+                                <form onSubmit={handleEnvoyer} style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                                    <input value={nouveauMessage} onChange={e => setNouveauMessage(e.target.value)} placeholder="Message..." required />
+                                    <button type="submit" className="btn-primary" style={{ borderRadius: '20px' }}>➤</button>
                                 </form>
                             </React.Fragment>
                         ) : (
-                            <p style={{ textAlign: 'center', marginTop: '20%' }}>Sélectionnez une discussion.</p>
+                            <p style={{ textAlign: 'center', marginTop: '20%', color: 'var(--text-muted)' }}>Sélectionnez une discussion.</p>
                         )}
                     </div>
                 </div>
@@ -1568,21 +1622,21 @@
             );
         }
 
-       // --- COMPOSANT FIL D'ACTUALITÉ ---
+        // --- COMPOSANT FIL D'ACTUALITÉ ---
         function FilActualite({ utilisateurConnecte, ouvrirProfil, modalOuverte, fermerModal }) {
             const [nouveauMessage, setNouveauMessage] = React.useState("");
             const [fichierMedia, setFichierMedia] = React.useState(null);
             const [publications, setPublications] = React.useState([]);
             const [chargement, setChargement] = React.useState(true);
             const [fluxActif, setFluxActif] = React.useState("recommandations");
-            
+
             const [commentairesOuverts, setCommentairesOuverts] = React.useState(null);
             const [listeCommentaires, setListeCommentaires] = React.useState([]);
 
             const [idPostEnEdition, setIdPostEnEdition] = React.useState(null);
             const [texteEdition, setTexteEdition] = React.useState("");
             const [idPostEnSuppression, setIdPostEnSuppression] = React.useState(null);
-            
+
             const [pubAPartager, setPubAPartager] = React.useState(null);
             const [listeContacts, setListeContacts] = React.useState([]);
 
@@ -1606,11 +1660,11 @@
                 if (fichierMedia) formData.append('media', fichierMedia);
 
                 fetch("../Backend/ajouter_publication.php", { method: "POST", body: formData })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.erreur) alert("❌ " + data.erreur);
-                    else { setNouveauMessage(""); setFichierMedia(null); fermerModal(); chargerPublications(); }
-                });
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.erreur) alert("❌ " + data.erreur);
+                        else { setNouveauMessage(""); setFichierMedia(null); fermerModal(); chargerPublications(); }
+                    });
             };
 
             const activerEditionInline = (pub) => {
@@ -1626,10 +1680,10 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ publication_id: pubId, utilisateur_id: utilisateurConnecte.ID, contenu: texteEdition })
                 })
-                .then(res => res.json()).then(data => {
-                    if (data.erreur) alert(data.erreur);
-                    else { setIdPostEnEdition(null); chargerPublications(); }
-                });
+                    .then(res => res.json()).then(data => {
+                        if (data.erreur) alert(data.erreur);
+                        else { setIdPostEnEdition(null); chargerPublications(); }
+                    });
             };
 
             const validerSuppressionInline = (pubId) => {
@@ -1638,10 +1692,10 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ publication_id: pubId, utilisateur_id: utilisateurConnecte.ID })
                 })
-                .then(res => res.json()).then(data => {
-                    if (data.erreur) alert(data.erreur);
-                    else { setIdPostEnSuppression(null); chargerPublications(); }
-                });
+                    .then(res => res.json()).then(data => {
+                        if (data.erreur) alert(data.erreur);
+                        else { setIdPostEnSuppression(null); chargerPublications(); }
+                    });
             };
 
             const ouvrirSignalement = (pub) => {
@@ -1658,10 +1712,10 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ publication_id: pubId, signaleur_id: utilisateurConnecte.ID, motif: motifSignalement })
                 })
-                .then(res => res.json()).then(data => {
-                    alert(data.succes || data.erreur);
-                    setIdPostEnSignalement(null);
-                });
+                    .then(res => res.json()).then(data => {
+                        alert(data.succes || data.erreur);
+                        setIdPostEnSignalement(null);
+                    });
             };
 
             const ouvrirPartage = (pub) => {
@@ -1682,10 +1736,10 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ expediteur_id: utilisateurConnecte.ID, destinataire_id: contactId, contenu: lien })
                 })
-                .then(res => res.json())
-                .then(data => {
-                    if(!data.erreur) { alert("✅ Partagé en message privé !"); setPubAPartager(null); }
-                });
+                    .then(res => res.json())
+                    .then(data => {
+                        if (!data.erreur) { alert("✅ Partagé en message privé !"); setPubAPartager(null); }
+                    });
             };
 
             return (
@@ -1716,7 +1770,7 @@
                             <div className="card"><p style={{ textAlign: 'center' }}>Aucune publication.</p></div>
                         ) : publications.map(pub => (
                             <div key={pub.ID} className="card post" style={{ marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: 'none' }}>
-                                
+
                                 <div className="post-header">
                                     <span className="post-author" onClick={() => ouvrirProfil(pub.Auteur_ID)} style={{ cursor: 'pointer', textDecoration: 'underline' }}>{pub.Nom}</span>
                                     {utilisateurConnecte && utilisateurConnecte.ID === pub.Auteur_ID && idPostEnEdition !== pub.ID ? (
@@ -1725,13 +1779,13 @@
                                             <button onClick={() => { setIdPostEnSuppression(pub.ID); setIdPostEnEdition(null); setIdPostEnSignalement(null); setPubAPartager(null); }} style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>Supprimer</button>
                                         </div>
                                     ) : utilisateurConnecte && utilisateurConnecte.ID !== pub.Auteur_ID && (
-                                        <button onClick={() => fetch("../Backend/suivre_utilisateur.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ suiveur_id: utilisateurConnecte.ID, suivi_id: pub.Auteur_ID }) }).then(() => chargerPublications())} 
-                                        style={{ 
-                                            backgroundColor: pub.EstAbonne ? 'var(--border-color)' : 'transparent', 
-                                            color: pub.EstAbonne ? 'var(--text-light)' : 'var(--orange-primary)', 
-                                            border: '1px solid var(--orange-primary)', 
-                                            borderRadius: '15px', padding: '0.2rem 0.8rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' 
-                                        }}>
+                                        <button onClick={() => fetch("../Backend/suivre_utilisateur.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ suiveur_id: utilisateurConnecte.ID, suivi_id: pub.Auteur_ID }) }).then(() => chargerPublications())}
+                                            style={{
+                                                backgroundColor: pub.EstAbonne ? 'var(--border-color)' : 'transparent',
+                                                color: pub.EstAbonne ? 'var(--text-light)' : 'var(--orange-primary)',
+                                                border: '1px solid var(--orange-primary)',
+                                                borderRadius: '15px', padding: '0.2rem 0.8rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold'
+                                            }}>
                                             {pub.EstAbonne ? "Abonné ✓" : "+ Suivre"}
                                         </button>
                                     )}
@@ -1774,7 +1828,7 @@
 
                                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', flexWrap: 'wrap' }}>
                                     <button className="btn-like" onClick={() => fetch("../Backend/liker_publication.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publication_id: pub.ID, utilisateur_id: utilisateurConnecte.ID }) }).then(() => chargerPublications())}>🔥 Respect {pub.NbLikes > 0 && `(${pub.NbLikes})`}</button>
-                                    <button className="btn-like" onClick={() => { if (commentairesOuverts === pub.ID) setCommentairesOuverts(null); else { setCommentairesOuverts(pub.ID); fetch(`../Backend/get_commentaires.php?pub_id=${pub.ID}`).then(res=>res.json()).then(d=>setListeCommentaires(d)); } }}>💬 Commenter</button>
+                                    <button className="btn-like" onClick={() => { if (commentairesOuverts === pub.ID) setCommentairesOuverts(null); else { setCommentairesOuverts(pub.ID); fetch(`../Backend/get_commentaires.php?pub_id=${pub.ID}`).then(res => res.json()).then(d => setListeCommentaires(d)); } }}>💬 Commenter</button>
                                     <button className="btn-like" style={{ borderColor: pubAPartager === pub.ID ? 'var(--orange-primary)' : '', color: pubAPartager === pub.ID ? 'var(--orange-primary)' : '' }} onClick={() => ouvrirPartage(pub)}>🔗 Partager</button>
                                     {utilisateurConnecte && utilisateurConnecte.ID !== pub.Auteur_ID && (
                                         <button className="btn-like" style={{ borderColor: idPostEnSignalement === pub.ID ? '#dc3545' : '', color: idPostEnSignalement === pub.ID ? '#dc3545' : '' }} onClick={() => ouvrirSignalement(pub)}>⚠️ Signaler</button>
@@ -1787,7 +1841,7 @@
                                             <strong style={{ color: 'var(--orange-primary)', fontSize: '0.9rem' }}>Partager cette performance :</strong>
                                             <button onClick={() => setPubAPartager(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>✖</button>
                                         </div>
-                                        
+
                                         <div style={{ display: 'flex', marginBottom: '1rem' }}>
                                             <button className="btn-like" style={{ width: '100%', justifyContent: 'center' }} onClick={() => {
                                                 const url = window.location.origin + "/post/" + pub.ID;
@@ -1823,7 +1877,7 @@
                 </div>
             );
         }
-       // --- COMPOSANT PROFIL PUBLIC (Vue pour les visiteurs) ---
+        // --- COMPOSANT PROFIL PUBLIC (Vue pour les visiteurs) ---
         function ProfilPublic({ id, visiteur, fermer, demarrerDiscussion }) {
             const [data, setData] = React.useState(null);
             const [chargement, setChargement] = React.useState(true);
@@ -1851,7 +1905,7 @@
                 })
                     .then(res => res.json())
                     .then(d => {
-                        if (!d.erreur) chargerProfil(); 
+                        if (!d.erreur) chargerProfil();
                     });
             };
 
@@ -1863,28 +1917,28 @@
 
             const validerSignalement = () => {
                 if (!motifSignalement.trim()) return alert("Veuillez préciser la raison du signalement.");
-                
+
                 fetch("../Backend/signaler_utilisateur.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ cible_id: id, signaleur_id: visiteur.ID, motif: motifSignalement })
                 })
-                .then(res => res.json())
-                .then(resData => {
-                    if (resData.erreur) alert("❌ " + resData.erreur);
-                    else {
-                        alert("✅ " + resData.succes);
-                        setModeSignalement(false);
-                        setMotifSignalement("");
-                    }
-                });
+                    .then(res => res.json())
+                    .then(resData => {
+                        if (resData.erreur) alert("❌ " + resData.erreur);
+                        else {
+                            alert("✅ " + resData.succes);
+                            setModeSignalement(false);
+                            setMotifSignalement("");
+                        }
+                    });
             };
 
             if (chargement) return <div className="card" style={{ textAlign: 'center' }}>Chargement du profil...</div>;
             if (!data || !data.utilisateur) return <div className="card" style={{ textAlign: 'center' }}>Profil introuvable. <button className="btn-primary" onClick={fermer}>Retour</button></div>;
 
             const u = data.utilisateur;
-            
+
             // Tri : Les posts épinglés par cet utilisateur remontent en premier
             const sortedPubs = [...data.publications].sort((a, b) => (b.Est_Epingle || 0) - (a.Est_Epingle || 0));
 
@@ -1922,7 +1976,7 @@
                                 >
                                     💬 Message
                                 </button>
-                                
+
                                 <button
                                     onClick={ouvrirSignalement}
                                     className="btn-primary"
@@ -1940,11 +1994,11 @@
                                     <button onClick={() => setModeSignalement(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>✖</button>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                    <textarea 
-                                        placeholder="Précisez la raison..." 
-                                        value={motifSignalement} 
-                                        onChange={(e) => setMotifSignalement(e.target.value)} 
-                                        rows="3" 
+                                    <textarea
+                                        placeholder="Précisez la raison..."
+                                        value={motifSignalement}
+                                        onChange={(e) => setMotifSignalement(e.target.value)}
+                                        rows="3"
                                         style={{ fontSize: '0.9rem', padding: '0.6rem', borderColor: '#dc3545' }}
                                     />
                                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
@@ -1964,7 +2018,7 @@
                         sortedPubs.map(pub => (
                             <div key={pub.ID} className="card post" style={{ padding: '1.5rem', border: pub.Est_Epingle == 1 ? '1px solid var(--orange-primary)' : '1px solid var(--border-color)' }}>
                                 {pub.Est_Epingle == 1 && <div style={{ color: 'var(--orange-primary)', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '0.8rem' }}>📌 Mis en avant par l'athlète</div>}
-                                
+
                                 <div className="post-header">
                                     <span className="post-author">{pub.Nom}</span>
                                     <span className="post-date">{pub.Date_Publication}</span>
@@ -2058,11 +2112,11 @@
                                     position: 'relative',
                                     transition: 'background-color 0.2s'
                                 }}
-                                onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2a2a2a'}
-                                onMouseLeave={e => e.currentTarget.style.backgroundColor = '#1a1a1a'}
+                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2a2a2a'}
+                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = '#1a1a1a'}
                                 >
-                                    <button onClick={(e) => supprimerNotif(e, n.ID)} style={{position:'absolute', right:'5px', top:'5px', background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', fontSize:'0.9rem'}}>✖</button>
-                                    
+                                    <button onClick={(e) => supprimerNotif(e, n.ID)} style={{ position: 'absolute', right: '5px', top: '5px', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem' }}>✖</button>
+
                                     <div style={{ paddingRight: '1rem' }}>
                                         {n.Type_Action === 'Like' && <span>🔥 <strong>{n.ActeurNom}</strong> a lâché un Respect.</span>}
                                         {n.Type_Action === 'Abonnement' && <span>👤 <strong>{n.ActeurNom}</strong> vous suit.</span>}
@@ -2137,7 +2191,7 @@
                 </div>
             );
         }
-       // --- COMPOSANT PRINCIPAL DE L'APPLICATION (Avec Mode Clair/Sombre) ---
+        // --- COMPOSANT PRINCIPAL DE L'APPLICATION (Avec Mode Clair/Sombre) ---
         function App() {
             const [ongletActif, setOngletActif] = React.useState('accueil');
             const [utilisateurConnecte, setUtilisateurConnecte] = React.useState(null);
@@ -2197,10 +2251,10 @@
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            
+
                             {/* BOUTON THÈME */}
-                            <button 
-                                onClick={() => setIsLightMode(!isLightMode)} 
+                            <button
+                                onClick={() => setIsLightMode(!isLightMode)}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.3rem', padding: 0 }}
                                 title="Changer de thème"
                             >
@@ -2211,9 +2265,9 @@
                                 <div className="notif-container">
                                     <button className="notif-bell" onClick={() => setAfficherNotifs(!afficherNotifs)}>🔔</button>
                                     {afficherNotifs && (
-                                        <NotificationsDropdown 
-                                            utilisateurConnecte={utilisateurConnecte} 
-                                            fermer={() => setAfficherNotifs(false)} 
+                                        <NotificationsDropdown
+                                            utilisateurConnecte={utilisateurConnecte}
+                                            fermer={() => setAfficherNotifs(false)}
                                             setOngletActif={setOngletActif}
                                             setProfilCible={setProfilCible}
                                         />
@@ -2272,7 +2326,7 @@
                         </div>
                         <div className={`nav-item ${ongletActif === 'communautes' ? 'active' : ''}`} onClick={() => { setOngletActif('communautes'); setProfilCible(null); setModalCreationOuverte(false); setAfficherNotifs(false); }}>
                             <span className="nav-icon">👥</span>
-                            <span style={{ fontSize: '0.7rem' }}>Groupes</span>
+                            <span style={{ fontSize: '0.7rem' }}>Hub</span>
                         </div>
                         <div className={`nav-item ${ongletActif === 'evenements' ? 'active' : ''}`} onClick={() => { setOngletActif('evenements'); setProfilCible(null); setModalCreationOuverte(false); setAfficherNotifs(false); }}>
                             <span className="nav-icon">📅</span>
