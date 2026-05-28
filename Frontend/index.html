@@ -557,94 +557,201 @@
             );
         }
 
-        // --- COMPOSANT ÉVÉNEMENTS (Avec formulaire de création opérationnel) ---
+        // --- COMPOSANT ÉVÉNEMENTS (Avec Calendrier Intégré) ---
         function Evenements({ utilisateurConnecte, modalOuverte, fermerModal }) {
             const [listeEvenements, setListeEvenements] = React.useState([]);
+            const [mesEvenements, setMesEvenements] = React.useState([]); // Événements rejoints
+            const [dateCalendrier, setDateCalendrier] = React.useState(new Date());
             const [chargement, setChargement] = React.useState(true);
 
-            // État pour le formulaire de création
-            const [formEvt, setFormEvt] = React.useState({ titre: '', lieu: '', date_evenement: '', description: '' });
+            // Formulaire
+            const [nouveauEvt, setNouveauEvt] = React.useState({ titre: '', description: '', date: '', lieu: '' });
 
-            const chargerEvenements = () => {
-                const userId = utilisateurConnecte ? utilisateurConnecte.ID : 0;
-                fetch(`../Backend/get_evenements.php?user_id=${userId}`)
+            const chargerDonnees = () => {
+                // 1. Charger tous les événements publics
+                fetch("../Backend/get_evenements.php")
                     .then(r => r.json())
-                    .then(data => { if (!data.erreur) setListeEvenements(data); setChargement(false); });
+                    .then(data => { setListeEvenements(data.erreur ? [] : data); setChargement(false); });
+                
+                // 2. Charger les événements spécifiques de l'utilisateur pour le calendrier
+                if (utilisateurConnecte) {
+                    fetch(`../Backend/get_mes_evenements.php?user_id=${utilisateurConnecte.ID}`)
+                        .then(r => r.json())
+                        .then(data => setMesEvenements(data.erreur ? [] : data));
+                }
             };
 
-            React.useEffect(() => { chargerEvenements(); }, [utilisateurConnecte]);
+            React.useEffect(() => { chargerDonnees(); }, [utilisateurConnecte]);
 
-            const handleParticiper = (id) => {
-                if (!utilisateurConnecte) return alert("Veuillez vous connecter.");
-                fetch("../Backend/participer_evenement.php", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ evenement_id: id, utilisateur_id: utilisateurConnecte.ID })
-                })
-                    .then(res => res.json()).then(data => { alert(data.succes || data.info || data.erreur); chargerEvenements(); });
-            };
-
-            const soumettreEvenement = (e) => {
+            const handleCreer = (e) => {
                 e.preventDefault();
                 fetch("../Backend/creer_evenement.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(formEvt)
+                    body: JSON.stringify({ ...nouveauEvt, createur_id: utilisateurConnecte.ID })
                 })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.erreur) alert("❌ " + data.erreur);
-                        else {
-                            alert("✅ " + data.succes);
-                            setFormEvt({ titre: '', lieu: '', date_evenement: '', description: '' });
-                            fermerModal();
-                            chargerEvenements();
-                        }
-                    });
+                .then(r => r.json()).then(data => {
+                    if (data.erreur) alert("❌ " + data.erreur);
+                    else {
+                        setNouveauEvt({ titre: '', description: '', date: '', lieu: '' });
+                        fermerModal();
+                        chargerDonnees();
+                    }
+                });
             };
+
+            const handleRejoindre = (id) => {
+                if (!utilisateurConnecte) return alert("Veuillez vous connecter pour rejoindre un événement.");
+                fetch("../Backend/rejoindre_evenement.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ evenement_id: id, utilisateur_id: utilisateurConnecte.ID })
+                })
+                .then(r => r.json()).then(data => {
+                    alert(data.succes ? "✅ " + data.succes : "❌ " + data.erreur);
+                    chargerDonnees(); // Recharge la liste ET le calendrier
+                });
+            };
+
+            // --- LOGIQUE DU CALENDRIER ---
+            const moisActuel = dateCalendrier.getMonth();
+            const anneeActuelle = dateCalendrier.getFullYear();
+            const nomsMois = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+            const joursSemaine = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+            const premierJourDuMois = new Date(anneeActuelle, moisActuel, 1).getDay();
+            const joursDansLeMois = new Date(anneeActuelle, moisActuel + 1, 0).getDate();
+            
+            // Décalage pour commencer lundi (0 = Lundi, 6 = Dimanche)
+            const decalage = premierJourDuMois === 0 ? 6 : premierJourDuMois - 1;
+            
+            const cellulesCalendrier = [];
+            for (let i = 0; i < decalage; i++) cellulesCalendrier.push(null);
+            for (let i = 1; i <= joursDansLeMois; i++) cellulesCalendrier.push(i);
+
+            const getEvenementsDuJour = (jour) => {
+                if (!jour) return [];
+                // Formatage AAAA-MM-JJ pour correspondre à la base de données
+                const dateStr = `${anneeActuelle}-${String(moisActuel + 1).padStart(2, '0')}-${String(jour).padStart(2, '0')}`;
+                return mesEvenements.filter(e => e.Date_Evenement && e.Date_Evenement.startsWith(dateStr));
+            };
+
+            const moisPrecedent = () => setDateCalendrier(new Date(anneeActuelle, moisActuel - 1, 1));
+            const moisSuivant = () => setDateCalendrier(new Date(anneeActuelle, moisActuel + 1, 1));
 
             return (
                 <div>
-                    {/* MODALE DE CRÉATION DE SESSION SÉCURISÉE */}
+                    {/* MODALE DE CRÉATION */}
                     {modalOuverte && (
                         <div className="modal-overlay" onClick={fermerModal}>
                             <div className="modal-content" onClick={e => e.stopPropagation()}>
                                 <button className="modal-close" onClick={fermerModal}>✖</button>
-                                <h3 style={{ marginTop: 0, color: 'var(--orange-primary)' }}>Organiser un entraînement</h3>
-                                <form onSubmit={soumettreEvenement} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                    <input type="text" placeholder="Nom de la session (ex: Séance Cardio / Muscu)" value={formEvt.titre} onChange={e => setFormEvt({ ...formEvt, titre: e.target.value })} required />
-                                    <input type="text" placeholder="Lieu ou équipement (ex: Parc / Salle)" value={formEvt.lieu} onChange={e => setFormEvt({ ...formEvt, lieu: e.target.value })} required />
-                                    <input type="datetime-local" value={formEvt.date_evenement} onChange={e => setFormEvt({ ...formEvt, date_evenement: e.target.value })} required />
-                                    <textarea placeholder="Objectifs et exercices prévus..." value={formEvt.description} onChange={e => setFormEvt({ ...formEvt, description: e.target.value })} rows="3" />
-                                    <button type="submit" className="btn-primary">Publier la session</button>
+                                <h3 style={{ marginTop: 0, color: 'var(--orange-primary)' }}>Créer un Événement</h3>
+                                <form onSubmit={handleCreer} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <input type="text" placeholder="Titre de l'événement..." value={nouveauEvt.titre} onChange={e => setNouveauEvt({...nouveauEvt, titre: e.target.value})} required />
+                                    <input type="datetime-local" value={nouveauEvt.date} onChange={e => setNouveauEvt({...nouveauEvt, date: e.target.value})} required style={{ padding: '0.8rem', backgroundColor: '#111', color: 'white', border: '1px solid var(--border-color)', borderRadius: '8px' }} />
+                                    <input type="text" placeholder="Lieu (Ville, Salle, Parc...)" value={nouveauEvt.lieu} onChange={e => setNouveauEvt({...nouveauEvt, lieu: e.target.value})} required />
+                                    <textarea placeholder="Description, programme, prérequis..." value={nouveauEvt.description} onChange={e => setNouveauEvt({...nouveauEvt, description: e.target.value})} rows="4" required />
+                                    <button type="submit" className="btn-primary">Publier l'événement</button>
                                 </form>
                             </div>
                         </div>
                     )}
 
-                    <div className="card" style={{ marginBottom: '2rem' }}>
-                        <h2 style={{ color: 'var(--orange-primary)', marginTop: 0 }}>Sessions Sportives</h2>
-                        <p style={{ margin: 0, color: 'var(--text-muted)' }}>Rejoignez un entraînement programmé par la communauté ConnectHub.</p>
-                    </div>
-
-                    {chargement ? <p style={{ textAlign: 'center' }}>Chargement...</p> : listeEvenements.map(evt => (
-                        <div key={evt.ID} className="card" style={{ borderLeft: evt.EstInscrit ? '4px solid #28a745' : '4px solid var(--orange-primary)' }}>
-                            <h3 style={{ margin: '0 0 0.5rem 0', color: evt.EstInscrit ? '#28a745' : 'white' }}>{evt.Titre}</h3>
-                            <div style={{ fontSize: '0.9rem', color: 'var(--text-light)', marginBottom: '1rem' }}>
-                                <span>📅 <strong>{evt.Date_Formatee}</strong></span><br />
-                                <span>📍 {evt.Lieu}</span>
+                    {/* CALENDRIER DES ÉVÉNEMENTS REJOINTS */}
+                    {utilisateurConnecte && (
+                        <div className="card" style={{ marginBottom: '2rem', padding: '1rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <button onClick={moisPrecedent} style={{ background: 'none', border: 'none', color: 'var(--orange-primary)', cursor: 'pointer', fontSize: '1.2rem' }}>◀</button>
+                                <h3 style={{ margin: 0, color: 'white' }}>Mon Calendrier : {nomsMois[moisActuel]} {anneeActuelle}</h3>
+                                <button onClick={moisSuivant} style={{ background: 'none', border: 'none', color: 'var(--orange-primary)', cursor: 'pointer', fontSize: '1.2rem' }}>▶</button>
                             </div>
-                            <p>{evt.Description}</p>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                {!evt.EstInscrit ? <button onClick={() => handleParticiper(evt.ID)} style={{ flex: 1, backgroundColor: 'transparent', color: 'var(--orange-primary)', border: '1px solid var(--orange-primary)', padding: '0.6rem', borderRadius: '20px', cursor: 'pointer', fontWeight: 'bold' }}>Je participe</button> : <div style={{ flex: 1, textAlign: 'center', color: '#28a745', padding: '0.6rem', border: '1px dashed #28a745', borderRadius: '20px' }}>Place réservée ✓</div>}
-                                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>🏃 {evt.NbParticipants} inscrits</span>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', marginBottom: '0.5rem' }}>
+                                {joursSemaine.map(j => <strong key={j} style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{j}</strong>)}
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+                                {cellulesCalendrier.map((jour, index) => {
+                                    const evts = getEvenementsDuJour(jour);
+                                    const estAujourdhui = jour === new Date().getDate() && moisActuel === new Date().getMonth() && anneeActuelle === new Date().getFullYear();
+                                    
+                                    return (
+                                        <div key={index} style={{ 
+                                            minHeight: '80px', 
+                                            backgroundColor: '#1a1a1a', 
+                                            border: estAujourdhui ? '1px solid var(--orange-primary)' : '1px solid var(--border-color)', 
+                                            borderRadius: '6px', 
+                                            padding: '4px',
+                                            display: 'flex',
+                                            flexDirection: 'column'
+                                        }}>
+                                            <span style={{ fontSize: '0.85rem', color: estAujourdhui ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: estAujourdhui ? 'bold' : 'normal', alignSelf: 'flex-end' }}>
+                                                {jour}
+                                            </span>
+                                            
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
+                                                {evts.map(e => (
+                                                    <div key={e.ID} style={{ 
+                                                        backgroundColor: 'var(--orange-primary)', 
+                                                        color: 'white', 
+                                                        fontSize: '0.7rem', 
+                                                        padding: '2px 4px', 
+                                                        borderRadius: '4px', 
+                                                        whiteSpace: 'nowrap', 
+                                                        overflow: 'hidden', 
+                                                        textOverflow: 'ellipsis',
+                                                        fontWeight: 'bold'
+                                                    }} title={`${e.Titre} - ${e.Lieu}`}>
+                                                        {e.Titre}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
-                    ))}
+                    )}
+
+                    {/* LISTE DES ÉVÉNEMENTS PUBLICS */}
+                    <h2 style={{ color: 'var(--orange-primary)', marginBottom: '1rem' }}>Tous les Événements</h2>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        {chargement ? (
+                            <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Recherche d'événements...</p>
+                        ) : listeEvenements.length === 0 ? (
+                            <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucun événement à venir.</p>
+                        ) : (
+                            listeEvenements.map(evt => (
+                                <div key={evt.ID} className="card" style={{ borderLeft: '4px solid #28a745' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                        <div>
+                                            <h3 style={{ margin: '0 0 0.5rem 0', color: 'white' }}>{evt.Titre}</h3>
+                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                                                <span>📅 {evt.Date_Evenement}</span> • <span>📍 {evt.Lieu}</span>
+                                            </div>
+                                            <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-light)' }}>{evt.Description}</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Organisé par <strong>{evt.Organisateur_Nom}</strong></span>
+                                        <button 
+                                            onClick={() => handleRejoindre(evt.ID)} 
+                                            className="btn-primary" 
+                                            style={{ padding: '0.4rem 1rem', fontSize: '0.8rem', backgroundColor: mesEvenements.some(m => m.ID === evt.ID) ? '#333' : '#28a745' }}
+                                        >
+                                            {mesEvenements.some(m => m.ID === evt.ID) ? 'Inscrit ✓' : 'S\'inscrire'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
             );
         }
-        // --- COMPOSANT RECHERCHE (Syntaxe Corrigée) ---
+        // --- COMPOSANT RECHERCHE ---
         function Recherche({ utilisateurConnecte, ouvrirProfil }) {
             const [requete, setRequete] = React.useState("");
             const [ongletActif, setOngletActif] = React.useState("tous");
@@ -655,7 +762,7 @@
                 { id: 'tous', label: 'Tout' },
                 { id: 'publications', label: 'Publications' },
                 { id: 'utilisateurs', label: 'Athlètes' },
-                { id: 'communautes', label: 'Communautés' },
+                { id: 'communautes', label: 'Hubs' },
                 { id: 'evenements', label: 'Événements' }
             ];
 
@@ -737,7 +844,7 @@
                                             </div>
                                         ) : res.Type_Source === 'communaute' || (!res.Type_Source && ongletActif === 'communautes') ? (
                                             <div>
-                                                <div style={{ fontWeight: 'bold', color: 'var(--orange-primary)' }}>👥 r/{res.Nom}</div>
+                                                <div style={{ fontWeight: 'bold', color: 'var(--orange-primary)' }}>👥 Hub {res.Nom}</div>
                                                 <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{res.Description}</p>
                                             </div>
                                         ) : res.Type_Source === 'evenement' || (!res.Type_Source && ongletActif === 'evenements') ? (
@@ -760,7 +867,7 @@
                 </div>
             );
         }
-        // --- COMPOSANT COMMUNAUTÉS (Publication réelle activée pour les membres abonnés) ---
+        // --- COMPOSANT COMMUNAUTÉS ---
         function Communautes({ utilisateurConnecte, modalOuverte, fermerModal }) {
             const [listeCommunautes, setListeCommunautes] = React.useState([]);
             const [communauteActive, setCommunauteActive] = React.useState(null); 
@@ -772,7 +879,8 @@
             const [listeDemandes, setListeDemandes] = React.useState([]);
             
             const [nouveauGroupe, setNouveauGroupe] = React.useState({ nom: '', description: '' });
-            const [nouveauPost, setNouveauPost] = React.useState({ titre: '', contenu: '' });
+            const [titrePost, setTitrePost] = React.useState('');
+            const [contenuPost, setContenuPost] = React.useState('');
 
             const chargerCommunautes = () => {
                 const userId = utilisateurConnecte ? utilisateurConnecte.ID : 0;
@@ -822,7 +930,7 @@
                     })
                 })
                 .then(res => res.json()).then(data => {
-                    if (data.erreur) alert("❌ " + data.erreur);
+                    if (data.erreur) alert("Erreur : " + data.erreur);
                     else {
                         chargerDemandesAdmin(communauteActive.ID); 
                         chargerMembresAdmin(communauteActive.ID); 
@@ -839,9 +947,9 @@
                     body: JSON.stringify({ communaute_id: communauteActive.ID, cible_id: cibleId, moderateur_id: utilisateurConnecte.ID })
                 })
                 .then(res => res.json()).then(data => {
-                    if (data.erreur) alert("❌ " + data.erreur);
+                    if (data.erreur) alert("Erreur : " + data.erreur);
                     else {
-                        alert("✅ " + data.succes);
+                        alert("Succès : " + data.succes);
                         chargerMembresAdmin(communauteActive.ID);
                     }
                 });
@@ -858,7 +966,7 @@
                     body: JSON.stringify({ communaute_id: id, utilisateur_id: utilisateurConnecte.ID }) 
                 })
                 .then(res => res.json()).then(data => {
-                    if(data.succes) alert("✅ " + data.succes);
+                    if(data.succes) alert("Succès : " + data.succes);
                     chargerCommunautes();
                 });
             };
@@ -867,43 +975,41 @@
                 e.preventDefault();
                 fetch("../Backend/creer_communaute.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nom: nouveauGroupe.nom, description: nouveauGroupe.description, createur_id: utilisateurConnecte.ID }) })
                 .then(res => res.json()).then(data => {
-                    if (data.erreur) alert("❌ " + data.erreur);
+                    if (data.erreur) alert("Erreur : " + data.erreur);
                     else { setNouveauGroupe({ nom: '', description: '' }); fermerModal(); chargerCommunautes(); }
                 });
             };
 
-            // LA VÉRITABLE FONCTION DE PUBLICATION 
-            const handleCreerPost = (e) => {
+            const handleCreerPost = (e, depuisModale = false) => {
                 e.preventDefault();
                 
-                // Vérification Frontend
                 if (communauteActive.Statut_Membre !== 'Accepte') {
                     alert("Action refusée : Vous devez être un membre abonné pour publier.");
                     return;
                 }
 
-                // Envoi réel à la base de données
                 fetch("../Backend/creer_discussion.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ 
                         communaute_id: communauteActive.ID, 
                         auteur_id: utilisateurConnecte.ID,
-                        titre: nouveauPost.titre,
-                        contenu: nouveauPost.contenu
+                        titre: titrePost,
+                        contenu: contenuPost
                     })
                 })
                 .then(res => res.json())
                 .then(data => {
                     if (data.erreur) {
-                        alert("❌ " + data.erreur);
+                        alert("Erreur : " + data.erreur);
                     } else {
-                        setNouveauPost({ titre: '', contenu: '' });
-                        fermerModal(); // On ferme la popup
-                        chargerDiscussions(communauteActive.ID); // On rafraîchit le fil de la communauté pour voir le nouveau post
+                        setTitrePost('');
+                        setContenuPost('');
+                        if (depuisModale) fermerModal();
+                        chargerDiscussions(communauteActive.ID); 
                     }
                 })
-                .catch(err => console.error("Erreur de publication :", err));
+                .catch(err => console.error("Erreur :", err));
             };
 
             const simulerVote = (id, valeur) => {
@@ -924,26 +1030,25 @@
                                 <button className="modal-close" onClick={fermerModal}>✖</button>
                                 
                                 {!communauteActive ? (
-                                    <>
-                                        <h3 style={{ marginTop: 0, color: 'var(--orange-primary)' }}>Créer une Communauté</h3>
+                                    <React.Fragment>
+                                        <h3 style={{ marginTop: 0, color: 'var(--orange-primary)' }}>Créer un Hub</h3>
                                         <form onSubmit={handleCreerGroupe} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                            <input type="text" placeholder="Nom (ex: r/Calisthenics)" value={nouveauGroupe.nom} onChange={(e) => setNouveauGroupe({...nouveauGroupe, nom: e.target.value})} required />
+                                            <input type="text" placeholder="Nom (ex: Hub Street Workout)" value={nouveauGroupe.nom} onChange={(e) => setNouveauGroupe({...nouveauGroupe, nom: e.target.value})} required />
                                             <textarea placeholder="Description et objectifs du groupe..." value={nouveauGroupe.description} onChange={(e) => setNouveauGroupe({...nouveauGroupe, description: e.target.value})} rows="3" />
-                                            <button type="submit" className="btn-primary">Créer le Sub</button>
+                                            <button type="submit" className="btn-primary">Créer le Hub</button>
                                         </form>
-                                    </>
+                                    </React.Fragment>
                                 ) : (
-                                    <>
-                                        {/* LE CADENAS PROTÈGE L'AFFICHAGE DU FORMULAIRE */}
+                                    <React.Fragment>
                                         {communauteActive.Statut_Membre === 'Accepte' ? (
-                                            <>
-                                                <h3 style={{ marginTop: 0, color: 'var(--orange-primary)' }}>Nouveau Post dans r/{communauteActive.Nom}</h3>
-                                                <form onSubmit={handleCreerPost} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                                    <input type="text" placeholder="Un titre explicite..." value={nouveauPost.titre} onChange={(e) => setNouveauPost({...nouveauPost, titre: e.target.value})} required />
-                                                    <textarea placeholder="Développez votre sujet..." value={nouveauPost.contenu} onChange={(e) => setNouveauPost({...nouveauPost, contenu: e.target.value})} rows="5" required />
+                                            <React.Fragment>
+                                                <h3 style={{ marginTop: 0, color: 'var(--orange-primary)' }}>Nouveau Post dans Hub {communauteActive.Nom}</h3>
+                                                <form onSubmit={(e) => handleCreerPost(e, true)} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                                    <input type="text" placeholder="Un titre explicite..." value={titrePost} onChange={(e) => setTitrePost(e.target.value)} required />
+                                                    <textarea placeholder="Développez votre sujet..." value={contenuPost} onChange={(e) => setContenuPost(e.target.value)} rows="5" required />
                                                     <button type="submit" className="btn-primary">Publier le Thread</button>
                                                 </form>
-                                            </>
+                                            </React.Fragment>
                                         ) : (
                                             <div style={{ textAlign: 'center', padding: '1rem' }}>
                                                 <span style={{ fontSize: '2rem' }}>🔒</span>
@@ -951,14 +1056,14 @@
                                                 <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Vous devez être membre abonné et validé par un modérateur de la communauté pour ouvrir un sujet.</p>
                                             </div>
                                         )}
-                                    </>
+                                    </React.Fragment>
                                 )}
                             </div>
                         </div>
                     )}
 
                     {!communauteActive ? (
-                        <>
+                        <React.Fragment>
                             <div className="card" style={{ marginBottom: '2rem' }}>
                                 <h2 style={{ color: 'var(--orange-primary)', marginTop: 0 }}>Hubs ConnectHub</h2>
                                 <p style={{ margin: 0, color: 'var(--text-muted)' }}>Forums ouverts à la lecture. Abonnez-vous pour interagir.</p>
@@ -972,7 +1077,7 @@
                                     return (
                                         <div key={communaute.ID} className="card" onClick={() => ouvrirCommunaute(communaute)} style={{ cursor: 'pointer', borderLeft: '4px solid var(--orange-primary)' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                                <h3 style={{ margin: 0 }}>r/{communaute.Nom}</h3>
+                                                <h3 style={{ margin: 0 }}>Hub {communaute.Nom}</h3>
                                                 <span style={{ backgroundColor: '#333', padding: '0.2rem 0.6rem', borderRadius: '15px', fontSize: '0.8rem' }}>👥 {communaute.NbMembres}</span>
                                             </div>
                                             <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-muted)' }}>{communaute.Description}</p>
@@ -983,16 +1088,16 @@
                                                 {!estAccepte && !estEnAttente && (
                                                     <button onClick={(e) => handleDemanderAdhesion(e, communaute.ID)} className="btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.75rem' }}>S'abonner</button>
                                                 )}
-                                                {estEnAttente && <span style={{ fontSize: '0.75rem', color: '#ffc107' }}>⏳ En attente de validation</span>}
-                                                {estAccepte && <span style={{ fontSize: '0.75rem', color: '#28a745' }}>✓ Membre Approuvé</span>}
+                                                {estEnAttente && <span style={{ fontSize: '0.75rem', color: '#ffc107' }}>⏳ En attente</span>}
+                                                {estAccepte && <span style={{ fontSize: '0.75rem', color: '#28a745' }}>✓ Approuvé</span>}
                                             </div>
                                         </div>
                                     )
                                 })}
                             </div>
-                        </>
+                        </React.Fragment>
                     ) : (
-                        <>
+                        <React.Fragment>
                             <button onClick={() => setCommunauteActive(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', marginBottom: '1rem', padding: 0, fontSize: '0.9rem' }}>
                                 ⬅ Retour aux Hubs
                             </button>
@@ -1000,7 +1105,7 @@
                             <div className="card" style={{ backgroundColor: 'rgba(255, 107, 0, 0.05)', border: '1px solid var(--orange-primary)' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <div>
-                                        <h2 style={{ color: 'white', marginTop: 0, marginBottom: '0.5rem' }}>r/{communauteActive.Nom}</h2>
+                                        <h2 style={{ color: 'white', marginTop: 0, marginBottom: '0.5rem' }}>Hub {communauteActive.Nom}</h2>
                                         <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }}>{communauteActive.Description}</p>
                                     </div>
                                     
@@ -1010,7 +1115,7 @@
                                             className="btn-primary" 
                                             style={{ backgroundColor: vueModeration ? '#333' : '#dc3545', fontSize: '0.8rem', padding: '0.5rem' }}
                                         >
-                                            {vueModeration ? "Fermer l'Admin" : "🛡️ Gérer la Communauté"}
+                                            {vueModeration ? "Fermer l'Admin" : "Gérer le Hub"}
                                         </button>
                                     )}
                                 </div>
@@ -1022,8 +1127,8 @@
                                 )}
                             </div>
 
-                            {vueModeration ? (
-                                <div className="card" style={{ border: '1px dashed #dc3545' }}>
+                            {vueModeration && (
+                                <div className="card" style={{ border: '1px dashed #dc3545', marginBottom: '1.5rem' }}>
                                     <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
                                         <button onClick={() => setOngletAdmin('demandes')} style={{ background: 'none', border: 'none', color: ongletAdmin === 'demandes' ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.9rem' }}>En attente</button>
                                         <button onClick={() => setOngletAdmin('membres')} style={{ background: 'none', border: 'none', color: ongletAdmin === 'membres' ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.9rem' }}>Membres Actifs</button>
@@ -1031,7 +1136,7 @@
 
                                     {ongletAdmin === 'demandes' ? (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            {listeDemandes.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Aucune demande en attente.</p> : listeDemandes.map(d => (
+                                            {listeDemandes.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Aucune demande.</p> : listeDemandes.map(d => (
                                                 <div key={d.ID} style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#111', borderRadius: '8px', fontSize: '0.9rem' }}>
                                                     Demande de : <strong style={{color: 'white'}}>{d.Nom}</strong>
                                                     <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '1rem' }}>
@@ -1056,7 +1161,7 @@
                                                             onClick={() => handlePromouvoir(m.ID, m.Nom)} 
                                                             style={{ backgroundColor: 'transparent', border: '1px solid #dc3545', color: '#dc3545', padding: '0.3rem 0.6rem', borderRadius: '15px', cursor: 'pointer', fontSize: '0.75rem' }}
                                                         >
-                                                            Promouvoir Modo
+                                                            Promouvoir
                                                         </button>
                                                     )}
                                                 </div>
@@ -1064,7 +1169,22 @@
                                         </div>
                                     )}
                                 </div>
-                            ) : discussions.length === 0 ? (
+                            )}
+
+                            {communauteActive.Statut_Membre === 'Accepte' && !vueModeration && (
+                                <div className="card" style={{ marginBottom: '1.5rem', backgroundColor: '#1a1a1a', border: '1px solid var(--border-color)' }}>
+                                    <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-light)', fontSize: '0.95rem' }}>Ouvrir une nouvelle discussion</h4>
+                                    <form onSubmit={(e) => handleCreerPost(e, false)} style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                                        <input type="text" placeholder="Titre de votre sujet..." value={titrePost} onChange={(e) => setTitrePost(e.target.value)} required style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'white' }} />
+                                        <textarea placeholder="Partagez vos interrogations ou vos performances..." value={contenuPost} onChange={(e) => setContenuPost(e.target.value)} rows="3" required style={{ padding: '0.8rem', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-dark)', color: 'white', resize: 'vertical' }} />
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                            <button type="submit" className="btn-primary" style={{ padding: '0.5rem 1.5rem', fontSize: '0.9rem' }}>Publier</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            )}
+
+                            {discussions.length === 0 ? (
                                 <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '2rem' }}>Aucun sujet ouvert pour l'instant.</p>
                             ) : (
                                 discussions.map(disc => (
@@ -1091,7 +1211,7 @@
                                     </div>
                                 ))
                             )}
-                        </>
+                        </React.Fragment>
                     )}
                 </div>
             );
@@ -1384,7 +1504,7 @@
             );
         }
 
-       // --- COMPOSANT FIL D'ACTUALITÉ (Signalement intégré et déplacé) ---
+       // --- COMPOSANT FIL D'ACTUALITÉ (Chaque post dans sa propre carte) ---
         function FilActualite({ utilisateurConnecte, ouvrirProfil, modalOuverte, fermerModal }) {
             const [nouveauMessage, setNouveauMessage] = React.useState("");
             const [fichierMedia, setFichierMedia] = React.useState(null);
@@ -1395,7 +1515,6 @@
             const [commentairesOuverts, setCommentairesOuverts] = React.useState(null);
             const [listeCommentaires, setListeCommentaires] = React.useState([]);
 
-            // ÉTATS : Édition, Suppression, Partage, Signalement
             const [idPostEnEdition, setIdPostEnEdition] = React.useState(null);
             const [texteEdition, setTexteEdition] = React.useState("");
             const [idPostEnSuppression, setIdPostEnSuppression] = React.useState(null);
@@ -1425,18 +1544,15 @@
                 fetch("../Backend/ajouter_publication.php", { method: "POST", body: formData })
                 .then(res => res.json())
                 .then(data => {
-                    if (data.erreur) alert("❌ " + data.erreur);
+                    if (data.erreur) alert("Erreur : " + data.erreur);
                     else { setNouveauMessage(""); setFichierMedia(null); fermerModal(); chargerPublications(); }
                 });
             };
 
-            // --- MODIFICATION ---
             const activerEditionInline = (pub) => {
                 setIdPostEnEdition(pub.ID);
                 setTexteEdition(pub.Contenu);
-                setIdPostEnSuppression(null); 
-                setPubAPartager(null);
-                setIdPostEnSignalement(null);
+                setIdPostEnSuppression(null); setIdPostEnSignalement(null); setPubAPartager(null);
             };
 
             const validerModificationInline = (pubId) => {
@@ -1464,50 +1580,35 @@
                 });
             };
 
-            // --- NOUVEAU : GESTION DU SIGNALEMENT INTÉGRÉ ---
             const ouvrirSignalement = (pub) => {
                 if (!utilisateurConnecte) return alert("Veuillez vous connecter pour signaler.");
-                if (idPostEnSignalement === pub.ID) {
-                    setIdPostEnSignalement(null); // Refermer
-                    return;
-                }
-                setIdPostEnSignalement(pub.ID);
+                setIdPostEnSignalement(idPostEnSignalement === pub.ID ? null : pub.ID);
                 setMotifSignalement("");
-                // On ferme les autres fenêtres pour éviter la surcharge
-                setPubAPartager(null);
-                setIdPostEnEdition(null);
-                setIdPostEnSuppression(null);
+                setPubAPartager(null); setIdPostEnEdition(null); setIdPostEnSuppression(null);
             };
 
             const validerSignalement = (pubId) => {
-                if (!motifSignalement.trim()) return alert("Veuillez préciser la raison du signalement.");
-                
+                if (!motifSignalement.trim()) return alert("Veuillez préciser la raison.");
                 fetch("../Backend/signaler_publication.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ publication_id: pubId, signaleur_id: utilisateurConnecte.ID, motif: motifSignalement })
                 })
                 .then(res => res.json()).then(data => {
-                    if (data.erreur) alert("❌ " + data.erreur);
-                    else {
-                        alert("✅ " + data.succes);
-                        setIdPostEnSignalement(null);
-                    }
+                    alert(data.succes || data.erreur);
+                    setIdPostEnSignalement(null);
                 });
             };
 
-            // --- PARTAGE ---
             const ouvrirPartage = (pub) => {
                 if (!utilisateurConnecte) return alert("Connectez-vous pour partager.");
-                if (pubAPartager === pub.ID) {
-                    setPubAPartager(null); 
-                    return;
+                setPubAPartager(pubAPartager === pub.ID ? null : pub.ID);
+                setIdPostEnSignalement(null); setIdPostEnEdition(null); setIdPostEnSuppression(null);
+                if (pubAPartager !== pub.ID) {
+                    fetch("../Backend/get_utilisateurs.php")
+                        .then(res => res.json())
+                        .then(data => { if (!data.erreur) setListeContacts(data.filter(u => u.ID !== utilisateurConnecte.ID)); });
                 }
-                setPubAPartager(pub.ID);
-                setIdPostEnSignalement(null); // Ferme le signalement si ouvert
-                fetch("../Backend/get_utilisateurs.php")
-                    .then(res => res.json())
-                    .then(data => { if (!data.erreur) setListeContacts(data.filter(u => u.ID !== utilisateurConnecte.ID)); });
             };
 
             const envoyerPartage = (contactId, pub) => {
@@ -1519,12 +1620,7 @@
                 })
                 .then(res => res.json())
                 .then(data => {
-                    if(!data.erreur) {
-                        alert("✅ Publication envoyée en message privé !");
-                        setPubAPartager(null);
-                    } else {
-                        alert("❌ Erreur d'envoi.");
-                    }
+                    if(!data.erreur) { alert("Partagé en message privé !"); setPubAPartager(null); }
                 });
             };
 
@@ -1533,8 +1629,8 @@
                     {modalOuverte && (
                         <div className="modal-overlay" onClick={fermerModal}>
                             <div className="modal-content" onClick={e => e.stopPropagation()}>
-                                <button className="modal-close" onClick={fermerModal}>✖</button>
-                                <h3 style={{ marginTop: 0, color: 'var(--orange-primary)' }}>Partager une performance</h3>
+                                <button className="modal-close" onClick={fermerModal}>X</button>
+                                <h3 style={{ marginTop: 0, color: '#FF6B00' }}>Partager une performance</h3>
                                 <form onSubmit={handlePublier} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                     <textarea value={nouveauMessage} onChange={(e) => setNouveauMessage(e.target.value)} placeholder="Décrivez votre séance, posez une question..." rows="4" required={!fichierMedia} />
                                     <input type="file" accept="image/*,video/*" onChange={(e) => setFichierMedia(e.target.files[0])} style={{ padding: 0 }} />
@@ -1544,35 +1640,34 @@
                         </div>
                     )}
 
-                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', justifyContent: 'center' }}>
-                        <button onClick={() => setFluxActif("recommandations")} style={{ background: 'none', border: 'none', color: fluxActif === "recommandations" ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer', fontSize: '1.1rem', borderBottom: fluxActif === "recommandations" ? '2px solid var(--orange-primary)' : 'none', paddingBottom: '0.3rem' }}>Pour vous</button>
-                        {utilisateurConnecte && (
-                            <button onClick={() => setFluxActif("abonnes")} style={{ background: 'none', border: 'none', color: fluxActif === "abonnes" ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: 'bold', cursor: 'pointer', fontSize: '1.1rem', borderBottom: fluxActif === "abonnes" ? '2px solid var(--orange-primary)' : 'none', paddingBottom: '0.3rem' }}>Abonnements</button>
-                        )}
+                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', justifyContent: 'center' }}>
+                        <button onClick={() => setFluxActif("recommandations")} style={{ background: 'none', border: 'none', color: fluxActif === "recommandations" ? '#FF6B00' : '#aaa', fontWeight: 'bold', cursor: 'pointer', fontSize: '1.1rem', borderBottom: fluxActif === "recommandations" ? '2px solid #FF6B00' : 'none', paddingBottom: '0.3rem' }}>Pour vous</button>
+                        {utilisateurConnecte && <button onClick={() => setFluxActif("abonnes")} style={{ background: 'none', border: 'none', color: fluxActif === "abonnes" ? '#FF6B00' : '#aaa', fontWeight: 'bold', cursor: 'pointer', fontSize: '1.1rem', borderBottom: fluxActif === "abonnes" ? '2px solid #FF6B00' : 'none', paddingBottom: '0.3rem' }}>Abonnements</button>}
                     </div>
 
-                    <div className="card">
-                        {chargement ? <p style={{ textAlign: 'center' }}>Chargement...</p> : publications.length === 0 ? <p style={{ textAlign: 'center' }}>Aucune publication.</p> : publications.map(pub => (
-                            <div key={pub.ID} className="post">
+                    <div>
+                        {chargement ? (
+                            <div className="card"><p style={{ textAlign: 'center' }}>Chargement...</p></div>
+                        ) : publications.length === 0 ? (
+                            <div className="card"><p style={{ textAlign: 'center' }}>Aucune publication.</p></div>
+                        ) : publications.map(pub => (
+                            <div key={pub.ID} className="card post" style={{ marginBottom: '1.5rem', paddingBottom: '1.5rem', borderBottom: 'none' }}>
                                 <div className="post-header">
                                     <span className="post-author" onClick={() => ouvrirProfil(pub.Auteur_ID)} style={{ cursor: 'pointer', textDecoration: 'underline' }}>{pub.Nom}</span>
-                                    
-                                    {/* Le bouton Signaler a été retiré d'ici */}
                                     {utilisateurConnecte && utilisateurConnecte.ID === pub.Auteur_ID && idPostEnEdition !== pub.ID ? (
                                         <div style={{ display: 'flex', gap: '0.6rem' }}>
-                                            <button onClick={() => activerEditionInline(pub)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>Modifier</button>
-                                            <button onClick={() => { setIdPostEnSuppression(pub.ID); setIdPostEnEdition(null); setIdPostEnSignalement(null); }} style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>Supprimer</button>
+                                            <button onClick={() => activerEditionInline(pub)} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>Modifier</button>
+                                            <button onClick={() => { setIdPostEnSuppression(pub.ID); setIdPostEnEdition(null); setIdPostEnSignalement(null); setPubAPartager(null); }} style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>Supprimer</button>
                                         </div>
                                     ) : utilisateurConnecte && utilisateurConnecte.ID !== pub.Auteur_ID && (
-                                        <button onClick={() => fetch("../Backend/suivre_utilisateur.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ suiveur_id: utilisateurConnecte.ID, suivi_id: pub.Auteur_ID }) }).then(() => chargerPublications())} style={{ backgroundColor: pub.EstAbonne ? '#333' : 'transparent', color: pub.EstAbonne ? 'white' : 'var(--orange-primary)', border: '1px solid var(--orange-primary)', borderRadius: '15px', padding: '0.2rem 0.8rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>{pub.EstAbonne ? "Abonné ✓" : "+ Suivre"}</button>
+                                        <button onClick={() => fetch("../Backend/suivre_utilisateur.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ suiveur_id: utilisateurConnecte.ID, suivi_id: pub.Auteur_ID }) }).then(() => chargerPublications())} style={{ backgroundColor: pub.EstAbonne ? '#333' : 'transparent', color: pub.EstAbonne ? 'white' : '#FF6B00', border: '1px solid #FF6B00', borderRadius: '15px', padding: '0.2rem 0.8rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>{pub.EstAbonne ? "Abonné" : "+ Suivre"}</button>
                                     )}
                                 </div>
-                                <span className="post-date" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{pub.Date_Publication}</span>
-                                
-                                {/* Interface de Suppression Intégrée */}
+                                <span className="post-date" style={{ display: 'block', marginBottom: '1rem', fontSize: '0.85rem', color: '#aaa' }}>{pub.Date_Publication}</span>
+
                                 {idPostEnSuppression === pub.ID && (
                                     <div style={{ backgroundColor: 'rgba(220, 53, 69, 0.1)', border: '1px solid #dc3545', padding: '0.8rem', borderRadius: '8px', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>Supprimer définitivement ce post ?</span>
+                                        <span style={{ fontSize: '0.85rem', color: '#f5f5f5' }}>Supprimer définitivement ce post ?</span>
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                                             <button className="btn-primary" style={{ backgroundColor: '#333', padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={() => setIdPostEnSuppression(null)}>Annuler</button>
                                             <button className="btn-primary" style={{ backgroundColor: '#dc3545', padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={() => validerSuppressionInline(pub.ID)}>Supprimer</button>
@@ -1580,7 +1675,6 @@
                                     </div>
                                 )}
 
-                                {/* Interface de Modification Intégrée */}
                                 {idPostEnEdition === pub.ID ? (
                                     <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                         <textarea value={texteEdition} onChange={(e) => setTexteEdition(e.target.value)} rows="3" style={{ fontSize: '0.95rem', padding: '0.6rem' }} />
@@ -1599,54 +1693,48 @@
                                     </div>
                                 )}
 
-                                {/* BARRE D'ACTIONS (Avec Signaler) */}
-                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', flexWrap: 'wrap' }}>
-                                    <button className="btn-like" onClick={() => fetch("../Backend/liker_publication.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publication_id: pub.ID, utilisateur_id: utilisateurConnecte.ID }) }).then(() => chargerPublications())}>🔥 Respect {pub.NbLikes > 0 && `(${pub.NbLikes})`}</button>
-                                    <button className="btn-like" onClick={() => { if (commentairesOuverts === pub.ID) setCommentairesOuverts(null); else { setCommentairesOuverts(pub.ID); fetch(`../Backend/get_commentaires.php?pub_id=${pub.ID}`).then(res=>res.json()).then(d=>setListeCommentaires(d)); } }}>💬 Commenter</button>
-                                    <button className="btn-like" style={{ borderColor: pubAPartager === pub.ID ? 'var(--orange-primary)' : '', color: pubAPartager === pub.ID ? 'var(--orange-primary)' : '' }} onClick={() => ouvrirPartage(pub)}>🔗 Partager</button>
-                                    
-                                    {/* BOUTON SIGNALER DÉPLACÉ ICI */}
+                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', borderTop: '1px solid #333', paddingTop: '1rem', flexWrap: 'wrap' }}>
+                                    <button className="btn-like" onClick={() => fetch("../Backend/liker_publication.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publication_id: pub.ID, utilisateur_id: utilisateurConnecte.ID }) }).then(() => chargerPublications())}>Respect {pub.NbLikes > 0 && `(${pub.NbLikes})`}</button>
+                                    <button className="btn-like" onClick={() => { if (commentairesOuverts === pub.ID) setCommentairesOuverts(null); else { setCommentairesOuverts(pub.ID); fetch(`../Backend/get_commentaires.php?pub_id=${pub.ID}`).then(res=>res.json()).then(d=>setListeCommentaires(d)); } }}>Commenter</button>
+                                    <button className="btn-like" style={{ borderColor: pubAPartager === pub.ID ? '#FF6B00' : '', color: pubAPartager === pub.ID ? '#FF6B00' : '' }} onClick={() => ouvrirPartage(pub)}>Partager</button>
                                     {utilisateurConnecte && utilisateurConnecte.ID !== pub.Auteur_ID && (
-                                        <button className="btn-like" style={{ borderColor: idPostEnSignalement === pub.ID ? '#dc3545' : '', color: idPostEnSignalement === pub.ID ? '#dc3545' : '' }} onClick={() => ouvrirSignalement(pub)}>⚠️ Signaler</button>
+                                        <button className="btn-like" style={{ borderColor: idPostEnSignalement === pub.ID ? '#dc3545' : '', color: idPostEnSignalement === pub.ID ? '#dc3545' : '' }} onClick={() => ouvrirSignalement(pub)}>Signaler</button>
                                     )}
                                 </div>
 
-                                {/* INTERFACE DE PARTAGE EN MP */}
                                 {pubAPartager === pub.ID && (
-                                    <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#1a1a1a', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                    <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#1a1a1a', borderRadius: '8px', border: '1px solid #FF6B00' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
-                                            <strong style={{ color: 'var(--orange-primary)', fontSize: '0.9rem' }}>Envoyer en message privé à :</strong>
-                                            <button onClick={() => setPubAPartager(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>✖</button>
+                                            <strong style={{ color: '#FF6B00', fontSize: '0.9rem' }}>Partager cette performance :</strong>
+                                            <button onClick={() => setPubAPartager(null)} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer' }}>X</button>
                                         </div>
+                                        
+                                        <div style={{ display: 'flex', marginBottom: '1rem' }}>
+                                            <button className="btn-like" style={{ width: '100%', justifyContent: 'center' }} onClick={() => {
+                                                const url = window.location.origin + "/post/" + pub.ID;
+                                                navigator.clipboard.writeText(url);
+                                                alert("Lien copié dans le presse-papier !");
+                                            }}>Copier le lien</button>
+                                        </div>
+
+                                        <div style={{ fontSize: '0.8rem', color: '#aaa', marginBottom: '0.5rem' }}>Ou envoyer en message interne :</div>
                                         <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                                            {listeContacts.length === 0 ? <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Aucun contact disponible.</span> : listeContacts.map(c => (
+                                            {listeContacts.length === 0 ? <span style={{ color: '#aaa', fontSize: '0.85rem' }}>Aucun contact disponible.</span> : listeContacts.map(c => (
                                                 <button key={c.ID} onClick={() => envoyerPartage(c.ID, pub)} className="btn-like" style={{ whiteSpace: 'nowrap', backgroundColor: '#333' }}>
-                                                    👤 {c.Nom}
+                                                    {c.Nom}
                                                 </button>
                                             ))}
                                         </div>
                                     </div>
                                 )}
 
-                                {/* INTERFACE DE SIGNALEMENT INTÉGRÉE */}
                                 {idPostEnSignalement === pub.ID && (
                                     <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'rgba(220, 53, 69, 0.05)', borderRadius: '8px', border: '1px dashed #dc3545' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
-                                            <strong style={{ color: '#dc3545', fontSize: '0.9rem' }}>Signaler cette publication :</strong>
-                                            <button onClick={() => setIdPostEnSignalement(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>✖</button>
-                                        </div>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            <textarea 
-                                                placeholder="Précisez la raison du signalement (Spam, Harcèlement, Contenu inapproprié...)" 
-                                                value={motifSignalement} 
-                                                onChange={(e) => setMotifSignalement(e.target.value)} 
-                                                rows="2" 
-                                                style={{ fontSize: '0.9rem', padding: '0.6rem', borderColor: '#dc3545' }}
-                                            />
-                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                                                <button className="btn-primary" style={{ backgroundColor: '#333', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setIdPostEnSignalement(null)}>Annuler</button>
-                                                <button className="btn-primary" style={{ backgroundColor: '#dc3545', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => validerSignalement(pub.ID)}>Envoyer le signalement</button>
-                                            </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}><strong style={{ color: '#dc3545', fontSize: '0.9rem' }}>Signaler :</strong><button onClick={() => setIdPostEnSignalement(null)} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer' }}>X</button></div>
+                                        <textarea placeholder="Motif du signalement..." value={motifSignalement} onChange={(e) => setMotifSignalement(e.target.value)} rows="2" style={{ fontSize: '0.9rem', padding: '0.6rem', borderColor: '#dc3545' }} />
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                            <button className="btn-primary" style={{ backgroundColor: '#333', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setIdPostEnSignalement(null)}>Annuler</button>
+                                            <button className="btn-primary" style={{ backgroundColor: '#dc3545', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => validerSignalement(pub.ID)}>Envoyer</button>
                                         </div>
                                     </div>
                                 )}

@@ -13,3 +13,6 @@ Blocage des publications invalides ou répétitives
 mode clair 
 publication epinglés 
 menu de signalement integrés
+
+séparer les posts du fil d'actu (que chacun soit dans une card et non tous dans le même)
+limiter le nombre de vote pour un post dans la partie communauté
