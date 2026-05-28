@@ -374,7 +374,7 @@
             font-size: 1.5rem;
         }
 
-        /* === NOUVEAU LAYOUT MESSAGERIE (Deux colonnes fixes) === */
+        /* === NOUVEAU LAYOUT MESSAGERIE (Adaptatif Clair/Sombre) === */
         .messages-layout {
             display: grid;
             grid-template-columns: 200px 1fr;
@@ -393,15 +393,16 @@
             display: flex;
             flex-direction: column;
             gap: 0.5rem;
-            background-color: rgba(0, 0, 0, 0.2);
+            background-color: var(--bg-dark);
         }
 
         .contact-item {
             padding: 0.8rem;
-            background-color: #111;
+            background-color: var(--bg-card);
+            color: var(--text-light);
             border-radius: 8px;
             cursor: pointer;
-            border: 1px solid transparent;
+            border: 1px solid var(--border-color);
             transition: all 0.2s ease;
             font-size: 0.9rem;
         }
@@ -409,7 +410,7 @@
         .contact-item:hover,
         .contact-item.active {
             border-color: var(--orange-primary);
-            background-color: #1a1a1a;
+            background-color: rgba(255, 107, 0, 0.08); /* Effet orangé léger */
         }
 
         .chat-area {
@@ -426,6 +427,28 @@
             overflow-y: auto;
             margin-bottom: 1rem;
             padding-right: 0.5rem;
+        }
+
+        /* Nouvelles classes pour les bulles de discussion */
+        .msg-bulle {
+            padding: 0.6rem 1rem;
+            border-radius: 15px;
+            font-size: 0.95rem;
+            max-width: 85%;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+
+        .msg-moi {
+            background-color: var(--orange-primary);
+            color: white; /* Le texte sur fond orange reste toujours blanc */
+            border-bottom-right-radius: 2px;
+        }
+
+        .msg-autre {
+            background-color: var(--border-color);
+            color: var(--text-light); /* S'adapte en noir ou blanc selon le thème */
+            border-bottom-left-radius: 2px;
         }
     </style>
 </head>
@@ -619,10 +642,10 @@
             );
         }
 
-        // --- COMPOSANT ÉVÉNEMENTS (Avec Calendrier Intégré) ---
+        // --- COMPOSANT ÉVÉNEMENTS (Correction du bouton S'inscrire) ---
         function Evenements({ utilisateurConnecte, modalOuverte, fermerModal }) {
             const [listeEvenements, setListeEvenements] = React.useState([]);
-            const [mesEvenements, setMesEvenements] = React.useState([]); // Événements rejoints
+            const [mesEvenements, setMesEvenements] = React.useState([]); 
             const [dateCalendrier, setDateCalendrier] = React.useState(new Date());
             const [chargement, setChargement] = React.useState(true);
 
@@ -630,12 +653,10 @@
             const [nouveauEvt, setNouveauEvt] = React.useState({ titre: '', description: '', date: '', lieu: '' });
 
             const chargerDonnees = () => {
-                // 1. Charger tous les événements publics
                 fetch("../Backend/get_evenements.php")
                     .then(r => r.json())
                     .then(data => { setListeEvenements(data.erreur ? [] : data); setChargement(false); });
                 
-                // 2. Charger les événements spécifiques de l'utilisateur pour le calendrier
                 if (utilisateurConnecte) {
                     fetch(`../Backend/get_mes_evenements.php?user_id=${utilisateurConnecte.ID}`)
                         .then(r => r.json())
@@ -662,17 +683,31 @@
                 });
             };
 
+            // --- FONCTION CORRIGÉE AVEC DÉTECTION D'ERREUR ---
             const handleRejoindre = (id) => {
                 if (!utilisateurConnecte) return alert("Veuillez vous connecter pour rejoindre un événement.");
+                
                 fetch("../Backend/rejoindre_evenement.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ evenement_id: id, utilisateur_id: utilisateurConnecte.ID })
                 })
-                .then(r => r.json()).then(data => {
-                    alert(data.succes ? "✅ " + data.succes : "❌ " + data.erreur);
-                    chargerDonnees(); // Recharge la liste ET le calendrier
-                });
+                .then(r => r.text()) // On lit en texte brut d'abord
+                .then(text => {
+                    try {
+                        const data = JSON.parse(text);
+                        if (data.erreur) {
+                            alert("❌ Erreur : " + data.erreur);
+                        } else {
+                            alert("✅ " + data.succes);
+                            chargerDonnees(); 
+                        }
+                    } catch(e) {
+                        alert("Erreur Serveur (PHP a renvoyé un problème). Réponse brute : " + text);
+                        console.error("Réponse brute du serveur :", text);
+                    }
+                })
+                .catch(err => alert("Erreur réseau : " + err));
             };
 
             // --- LOGIQUE DU CALENDRIER ---
@@ -684,7 +719,6 @@
             const premierJourDuMois = new Date(anneeActuelle, moisActuel, 1).getDay();
             const joursDansLeMois = new Date(anneeActuelle, moisActuel + 1, 0).getDate();
             
-            // Décalage pour commencer lundi (0 = Lundi, 6 = Dimanche)
             const decalage = premierJourDuMois === 0 ? 6 : premierJourDuMois - 1;
             
             const cellulesCalendrier = [];
@@ -693,7 +727,6 @@
 
             const getEvenementsDuJour = (jour) => {
                 if (!jour) return [];
-                // Formatage AAAA-MM-JJ pour correspondre à la base de données
                 const dateStr = `${anneeActuelle}-${String(moisActuel + 1).padStart(2, '0')}-${String(jour).padStart(2, '0')}`;
                 return mesEvenements.filter(e => e.Date_Evenement && e.Date_Evenement.startsWith(dateStr));
             };
@@ -703,7 +736,6 @@
 
             return (
                 <div>
-                    {/* MODALE DE CRÉATION */}
                     {modalOuverte && (
                         <div className="modal-overlay" onClick={fermerModal}>
                             <div className="modal-content" onClick={e => e.stopPropagation()}>
@@ -720,7 +752,6 @@
                         </div>
                     )}
 
-                    {/* CALENDRIER DES ÉVÉNEMENTS REJOINTS */}
                     {utilisateurConnecte && (
                         <div className="card" style={{ marginBottom: '2rem', padding: '1rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -776,7 +807,6 @@
                         </div>
                     )}
 
-                    {/* LISTE DES ÉVÉNEMENTS PUBLICS */}
                     <h2 style={{ color: 'var(--orange-primary)', marginBottom: '1rem' }}>Tous les Événements</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                         {chargement ? (
@@ -784,41 +814,48 @@
                         ) : listeEvenements.length === 0 ? (
                             <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucun événement à venir.</p>
                         ) : (
-                            listeEvenements.map(evt => (
-                                <div key={evt.ID} className="card" style={{ borderLeft: '4px solid #28a745' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                        <div>
-                                            <h3 style={{ margin: '0 0 0.5rem 0', color: 'white' }}>{evt.Titre}</h3>
-                                            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                                                <span>📅 {evt.Date_Evenement}</span> • <span>📍 {evt.Lieu}</span>
+                            listeEvenements.map(evt => {
+                                // Remplacement de === par == pour éviter les bugs de types entre SQL et JS
+                                const estInscrit = mesEvenements.some(m => m.ID == evt.ID); 
+                                
+                                return (
+                                    <div key={evt.ID} className="card" style={{ borderLeft: '4px solid #28a745' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                            <div>
+                                                <h3 style={{ margin: '0 0 0.5rem 0', color: 'white' }}>{evt.Titre}</h3>
+                                                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                                                    <span>📅 {evt.Date_Evenement}</span> • <span>📍 {evt.Lieu}</span>
+                                                </div>
+                                                <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-light)' }}>{evt.Description}</p>
                                             </div>
-                                            <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-light)' }}>{evt.Description}</p>
+                                        </div>
+                                        
+                                        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Organisé par <strong>{evt.Organisateur_Nom}</strong></span>
+                                            <button 
+                                                onClick={() => handleRejoindre(evt.ID)} 
+                                                className="btn-primary" 
+                                                style={{ padding: '0.4rem 1rem', fontSize: '0.8rem', backgroundColor: estInscrit ? '#333' : '#28a745' }}
+                                            >
+                                                {estInscrit ? 'Inscrit ✓' : 'S\'inscrire'}
+                                            </button>
                                         </div>
                                     </div>
-                                    
-                                    <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Organisé par <strong>{evt.Organisateur_Nom}</strong></span>
-                                        <button 
-                                            onClick={() => handleRejoindre(evt.ID)} 
-                                            className="btn-primary" 
-                                            style={{ padding: '0.4rem 1rem', fontSize: '0.8rem', backgroundColor: mesEvenements.some(m => m.ID === evt.ID) ? '#333' : '#28a745' }}
-                                        >
-                                            {mesEvenements.some(m => m.ID === evt.ID) ? 'Inscrit ✓' : 'S\'inscrire'}
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </div>
             );
         }
-        // --- COMPOSANT RECHERCHE ---
+        // --- COMPOSANT RECHERCHE (Tri visuel cohérent) ---
         function Recherche({ utilisateurConnecte, ouvrirProfil }) {
             const [requete, setRequete] = React.useState("");
             const [ongletActif, setOngletActif] = React.useState("tous");
             const [resultats, setResultats] = React.useState([]);
             const [chargement, setChargement] = React.useState(false);
+            
+            const [triActif, setTriActif] = React.useState("pertinence");
 
             const onglets = [
                 { id: 'tous', label: 'Tout' },
@@ -849,39 +886,120 @@
 
             }, [requete, ongletActif]);
 
+            // --- L'INTELLIGENCE DU TRI EST ICI ---
+            const getTexteTri = (item) => {
+                const type = item.Type_Source || ongletActif;
+                
+                // Pour un Hub : on trie sur le mot "Hub" suivi du nom
+                if (type === 'communaute') return ("hub " + (item.Nom || "")).toLowerCase();
+                
+                // Pour une publication : on trie d'abord sur le nom de l'AUTEUR (en gras), puis le contenu
+                if (type === 'publication') {
+                    const auteur = item.Nom || "";
+                    const contenu = item.Contenu || "";
+                    return (auteur + " " + contenu).toLowerCase();
+                }
+                
+                // Pour le reste (Événements, Utilisateurs) : on trie sur le nom principal
+                return (item.Nom || item.Titre || "").toString().toLowerCase();
+            };
+
+            const getTimestamp = (item) => {
+                const dateBrute = item.Date_Publication || item.Date_Evenement;
+                if (!dateBrute) return null; 
+                const parsed = new Date(dateBrute.replace(' ', 'T')).getTime();
+                return isNaN(parsed) ? null : parsed;
+            };
+
+            const resultatsTries = [...resultats].sort((a, b) => {
+                if (triActif === 'pertinence') return 0; 
+
+                if (triActif === 'az') return getTexteTri(a).localeCompare(getTexteTri(b));
+                if (triActif === 'za') return getTexteTri(b).localeCompare(getTexteTri(a));
+                
+                const timeA = getTimestamp(a);
+                const timeB = getTimestamp(b);
+
+                if (triActif === 'recent') {
+                    if (timeA === null && timeB === null) return 0;
+                    if (timeA === null) return 1;
+                    if (timeB === null) return -1;
+                    return timeB - timeA;
+                }
+                if (triActif === 'ancien') {
+                    if (timeA === null && timeB === null) return 0;
+                    if (timeA === null) return 1;
+                    if (timeB === null) return -1;
+                    return timeA - timeB;
+                }
+                
+                return 0;
+            });
+
             return (
                 <div>
                     <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
                         <div style={{ position: 'relative' }}>
-                            <span style={{ position: 'absolute', left: '15px', top: '15px', fontSize: '1.2rem' }}>🔍</span>
+                            <span style={{ position: 'absolute', left: '15px', top: '15px', fontSize: '1.2rem', color: 'var(--text-muted)' }}>🔍</span>
                             <input 
                                 type="text" 
                                 placeholder="Recherche globale ConnectHub..."
                                 value={requete}
                                 onChange={(e) => setRequete(e.target.value)}
-                                style={{ width: '100%', padding: '1rem 1rem 1rem 3rem', borderRadius: '25px', backgroundColor: '#111', border: '1px solid var(--border-color)', color: 'white' }} 
+                                style={{ 
+                                    width: '100%', 
+                                    padding: '1rem 1rem 1rem 3rem', 
+                                    borderRadius: '25px', 
+                                    backgroundColor: 'var(--bg-dark)', 
+                                    border: '1px solid var(--border-color)', 
+                                    color: 'var(--text-light)' 
+                                }} 
                             />
                         </div>
 
-                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                            {onglets.map(onglet => (
-                                <button 
-                                    key={onglet.id}
-                                    onClick={() => setOngletActif(onglet.id)}
-                                    style={{
-                                        backgroundColor: ongletActif === onglet.id ? 'var(--orange-primary)' : 'transparent',
-                                        color: ongletActif === onglet.id ? 'white' : 'var(--text-muted)',
-                                        border: `1px solid ${ongletActif === onglet.id ? 'var(--orange-primary)' : 'var(--border-color)'}`,
-                                        padding: '0.4rem 1rem',
-                                        borderRadius: '20px',
-                                        cursor: 'pointer',
-                                        whiteSpace: 'nowrap',
-                                        fontWeight: ongletActif === onglet.id ? 'bold' : 'normal'
-                                    }}
-                                >
-                                    {onglet.label}
-                                </button>
-                            ))}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+                            
+                            <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem', flex: 1 }}>
+                                {onglets.map(onglet => (
+                                    <button 
+                                        key={onglet.id}
+                                        onClick={() => setOngletActif(onglet.id)}
+                                        style={{
+                                            backgroundColor: ongletActif === onglet.id ? 'var(--orange-primary)' : 'transparent',
+                                            color: ongletActif === onglet.id ? 'white' : 'var(--text-muted)',
+                                            border: `1px solid ${ongletActif === onglet.id ? 'var(--orange-primary)' : 'var(--border-color)'}`,
+                                            padding: '0.4rem 1rem',
+                                            borderRadius: '20px',
+                                            cursor: 'pointer',
+                                            whiteSpace: 'nowrap',
+                                            fontWeight: ongletActif === onglet.id ? 'bold' : 'normal'
+                                        }}
+                                    >
+                                        {onglet.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <select 
+                                value={triActif} 
+                                onChange={(e) => setTriActif(e.target.value)}
+                                style={{ 
+                                    padding: '0.4rem 1rem', 
+                                    borderRadius: '20px', 
+                                    backgroundColor: 'var(--bg-dark)', 
+                                    color: 'var(--text-light)', 
+                                    border: '1px solid var(--border-color)', 
+                                    outline: 'none', 
+                                    cursor: 'pointer',
+                                    fontSize: '0.85rem'
+                                }}
+                            >
+                                <option value="pertinence">Trier par Pertinence</option>
+                                <option value="recent">Les plus récents</option>
+                                <option value="ancien">Les plus anciens</option>
+                                <option value="az">De A à Z</option>
+                                <option value="za">De Z à A</option>
+                            </select>
                         </div>
                     </div>
 
@@ -890,40 +1008,47 @@
                             <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '2rem' }}>Entrez un mot-clé pour explorer ConnectHub.</p>
                         ) : chargement ? (
                             <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Recherche dynamique...</p>
-                        ) : resultats.length === 0 ? (
+                        ) : resultatsTries.length === 0 ? (
                             <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucun résultat pour "{requete}".</p>
                         ) : (
-                            resultats.map((res, index) => (
-                                <div key={res.ID || index} className="card" style={{ padding: '1rem', marginBottom: '0.5rem' }}>
-                                    {
-                                        res.Type_Source === 'utilisateur' || (!res.Type_Source && ongletActif === 'utilisateurs') ? (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }} onClick={() => ouvrirProfil(res.ID)}>
-                                                <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '40px', height: '40px' }}>{res.Nom ? res.Nom.charAt(0) : 'U'}</div>
-                                                <div>
-                                                    <div style={{ fontWeight: 'bold' }}>{res.Nom}</div>
-                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Athlète • {res.Role || 'Membre'}</div>
+                            resultatsTries.map((res, index) => {
+                                const typeOrigine = res.Type_Source || ongletActif;
+                                const cleUnique = `resultat-${typeOrigine}-${res.ID}-${index}`;
+
+                                return (
+                                    <div key={cleUnique} className="card" style={{ padding: '1rem', marginBottom: '0.5rem' }}>
+                                        {
+                                            res.Type_Source === 'utilisateur' || (!res.Type_Source && ongletActif === 'utilisateurs') ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', cursor: 'pointer' }} onClick={() => ouvrirProfil(res.ID)}>
+                                                    <div className="profile-pic" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '40px', height: '40px', backgroundColor: 'var(--bg-dark)' }}>{res.Nom ? res.Nom.charAt(0) : 'U'}</div>
+                                                    <div>
+                                                        <div style={{ fontWeight: 'bold', color: 'var(--text-light)' }}>{res.Nom}</div>
+                                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Athlète • {res.Role || 'Membre'}</div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ) : res.Type_Source === 'communaute' || (!res.Type_Source && ongletActif === 'communautes') ? (
-                                            <div>
-                                                <div style={{ fontWeight: 'bold', color: 'var(--orange-primary)' }}>👥 Hub {res.Nom}</div>
-                                                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{res.Description}</p>
-                                            </div>
-                                        ) : res.Type_Source === 'evenement' || (!res.Type_Source && ongletActif === 'evenements') ? (
-                                            <div>
-                                                <div style={{ fontWeight: 'bold', color: '#28a745' }}>📅 {res.Nom}</div>
-                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>📍 {res.Lieu}</div>
-                                                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{res.Description}</p>
-                                            </div>
-                                        ) : res.Type_Source === 'publication' || (!res.Type_Source && ongletActif === 'publications') ? (
-                                            <div>
-                                                <div className="post-author" style={{ fontSize: '0.9rem', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => ouvrirProfil(res.Auteur_ID)}>{res.Nom}</div>
-                                                <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem' }}>{res.Contenu}</p>
-                                            </div>
-                                        ) : null
-                                    }
-                                </div>
-                            ))
+                                            ) : res.Type_Source === 'communaute' || (!res.Type_Source && ongletActif === 'communautes') ? (
+                                                <div>
+                                                    <div style={{ fontWeight: 'bold', color: 'var(--orange-primary)' }}>👥 Hub {res.Nom}</div>
+                                                    <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{res.Description}</p>
+                                                </div>
+                                            ) : res.Type_Source === 'evenement' || (!res.Type_Source && ongletActif === 'evenements') ? (
+                                                <div>
+                                                    <div style={{ fontWeight: 'bold', color: '#28a745' }}>📅 {res.Nom || res.Titre}</div>
+                                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>📍 {res.Lieu}</div>
+                                                    <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{res.Description}</p>
+                                                    {res.Date_Evenement && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>Prévu le : {res.Date_Evenement}</div>}
+                                                </div>
+                                            ) : res.Type_Source === 'publication' || (!res.Type_Source && ongletActif === 'publications') ? (
+                                                <div>
+                                                    <div className="post-author" style={{ fontSize: '0.9rem', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => ouvrirProfil(res.Auteur_ID)}>{res.Nom}</div>
+                                                    {res.Date_Publication && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>{res.Date_Publication}</div>}
+                                                    <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem', color: 'var(--text-light)' }}>{res.Contenu}</p>
+                                                </div>
+                                            ) : null
+                                        }
+                                    </div>
+                                );
+                            })
                         )}
                     </div>
                 </div>
@@ -1278,7 +1403,7 @@
                 </div>
             );
         }
-        // --- COMPOSANT MESSAGERIE PRIVÉE (Correction d'ascenseur et Auto-scroll) ---
+        // --- COMPOSANT MESSAGERIE PRIVÉE (Correction finale Mode Clair) ---
         function Messages({ utilisateurConnecte, contactPreselectionne }) {
             const [listeContacts, setListeContacts] = React.useState([]);
             const [evenementsRejoints, setEvenementsRejoints] = React.useState([]);
@@ -1292,7 +1417,6 @@
 
             const chatContainerRef = React.useRef(null);
             
-            // Correction du scroll : Un léger délai assure que le DOM est à jour avant de scroller
             React.useEffect(() => {
                 if (chatContainerRef.current) {
                     setTimeout(() => {
@@ -1419,10 +1543,10 @@
                                 <form onSubmit={handleCreerGroupe} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                     <input type="text" placeholder="Nom du groupe..." value={nomNouveauGroupe} onChange={e => setNomNouveauGroupe(e.target.value)} required />
                                     
-                                    <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid var(--border-color)', padding: '0.5rem', borderRadius: '8px' }}>
+                                    <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid var(--border-color)', padding: '0.5rem', borderRadius: '8px', backgroundColor: 'var(--bg-dark)' }}>
                                         <p style={{ margin: '0 0 0.5rem 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>Sélectionnez les membres :</p>
                                         {listeContacts.map(c => (
-                                            <label key={c.ID} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem', cursor: 'pointer' }}>
+                                            <label key={c.ID} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem', cursor: 'pointer', color: 'var(--text-light)' }}>
                                                 <input type="checkbox" checked={membresCoches.includes(c.ID)} onChange={() => toggleMembre(c.ID)} />
                                                 {c.Nom}
                                             </label>
@@ -1430,7 +1554,7 @@
                                     </div>
 
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <button type="button" className="btn-primary" style={{ flex: 1, backgroundColor: '#333' }} onClick={() => setModalGroupe(false)}>Annuler</button>
+                                        <button type="button" className="btn-primary" style={{ flex: 1, backgroundColor: 'var(--border-color)', color: 'var(--text-light)' }} onClick={() => setModalGroupe(false)}>Annuler</button>
                                         <button type="submit" className="btn-primary" style={{ flex: 1 }}>Créer</button>
                                     </div>
                                 </form>
@@ -1474,7 +1598,6 @@
                                     </h3>
                                 </div>
                                 
-                                {/* LA CLÉ DU SCROLL: minHeight: 0 et flex: '1 1 0' empêchent le dépassement */}
                                 <div className="messages-container" ref={chatContainerRef} style={{ overflowY: 'auto', flex: '1 1 0', minHeight: 0, paddingRight: '0.5rem' }}>
                                     {historiqueMessages.map(msg => {
                                         const estMoi = msg.Expediteur_ID === utilisateurConnecte.ID;
@@ -1483,10 +1606,12 @@
                                                 {(discussionType === 'evenement' || discussionType === 'salon') && !estMoi && (
                                                     <small style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '2px', marginLeft: '4px' }}>{msg.Expediteur_Nom}</small>
                                                 )}
-                                                <div style={{ backgroundColor: estMoi ? (msg.Statut === 'En_Attente' ? '#555' : 'var(--orange-primary)') : '#333', padding: '0.6rem 1rem', borderRadius: '15px', fontSize: '0.9rem', maxWidth: '85%', wordWrap: 'break-word' }}>
+                                                
+                                                <div className={`msg-bulle ${estMoi ? 'msg-moi' : 'msg-autre'}`} style={{ opacity: msg.Statut === 'En_Attente' ? 0.7 : 1 }}>
                                                     {msg.Contenu}
-                                                    {msg.Statut === 'En_Attente' && estMoi && <small style={{ fontSize: '0.7rem', display: 'block', color: '#aaa' }}>(Demande)</small>}
+                                                    {msg.Statut === 'En_Attente' && estMoi && <small style={{ fontSize: '0.7rem', display: 'block', color: 'rgba(255,255,255,0.7)', marginTop: '4px' }}>(Envoi en cours...)</small>}
                                                 </div>
+                                                
                                             </div>
                                         );
                                     })}
@@ -1495,7 +1620,7 @@
                                 {infoStatut && <p style={{ color: 'var(--orange-primary)', fontSize: '0.85rem', margin: '0 0 0.5rem 0' }}>{infoStatut}</p>}
 
                                 <form onSubmit={handleEnvoyer} style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                                    <input type="text" placeholder="Écrire dans le salon..." value={nouveauMessage} onChange={e => setNouveauMessage(e.target.value)} required />
+                                    <input type="text" placeholder="Écrire un message..." value={nouveauMessage} onChange={e => setNouveauMessage(e.target.value)} required />
                                     <button type="submit" className="btn-primary" style={{ padding: '0.6rem 1.2rem' }}>➤</button>
                                 </form>
                             </React.Fragment>
