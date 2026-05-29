@@ -510,7 +510,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // --- COMPOSANT PROFIL PERSONNEL ---
+        // --- COMPOSANT PROFIL PERSONNEL (Avec gestion des posts ajoutée) ---
         function Profil({ utilisateurConnecte, setUtilisateurConnecte, setOngletActif }) {
             const [sousOnglet, setSousOnglet] = React.useState('publications');
             const [modeEditionForm, setModeEditionForm] = React.useState(false);
@@ -520,6 +520,11 @@
 
             const [donneesReseau, setDonneesReseau] = React.useState(null);
             const [chargementDonnees, setChargementDonnees] = React.useState(true);
+
+            // Nouveaux états pour modifier/supprimer ses propres posts depuis son profil
+            const [idPostEnEdition, setIdPostEnEdition] = React.useState(null);
+            const [texteEdition, setTexteEdition] = React.useState("");
+            const [idPostEnSuppression, setIdPostEnSuppression] = React.useState(null);
 
             const chargerDonneesPerso = () => {
                 fetch(`../Backend/get_profil_public.php?id=${utilisateurConnecte.ID}&visiteur=${utilisateurConnecte.ID}`)
@@ -570,17 +575,44 @@
                     .then(text => {
                         try {
                             const data = JSON.parse(text);
-                            if (data.erreur) {
-                                alert("Erreur Serveur : " + data.erreur);
-                            } else {
-                                chargerDonneesPerso();
-                            }
+                            if (data.erreur) alert("Erreur Serveur : " + data.erreur);
+                            else chargerDonneesPerso();
                         } catch (e) {
-                            alert("Erreur fatale (Voir console F12). Réponse du serveur : " + text);
-                            console.error("Réponse brute du serveur :", text);
+                            alert("Erreur fatale. Réponse du serveur : " + text);
                         }
-                    })
-                    .catch(err => alert("Erreur réseau : " + err));
+                    });
+            };
+
+            // Fonctions pour l'édition et la suppression de post
+            const activerEditionInline = (pub) => {
+                setIdPostEnEdition(pub.ID);
+                setTexteEdition(pub.Contenu);
+                setIdPostEnSuppression(null);
+            };
+
+            const validerModificationInline = (pubId) => {
+                if (!texteEdition.trim()) return;
+                fetch("../Backend/modifier_publication.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ publication_id: pubId, utilisateur_id: utilisateurConnecte.ID, contenu: texteEdition })
+                })
+                    .then(res => res.json()).then(data => {
+                        if (data.erreur) alert(data.erreur);
+                        else { setIdPostEnEdition(null); chargerDonneesPerso(); }
+                    });
+            };
+
+            const validerSuppressionInline = (pubId) => {
+                fetch("../Backend/supprimer_publication.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ publication_id: pubId, utilisateur_id: utilisateurConnecte.ID })
+                })
+                    .then(res => res.json()).then(data => {
+                        if (data.erreur) alert(data.erreur);
+                        else { setIdPostEnSuppression(null); chargerDonneesPerso(); }
+                    });
             };
 
             const uStats = donneesReseau ? donneesReseau.utilisateurs || donneesReseau.utilisateur : utilisateurConnecte;
@@ -620,17 +652,46 @@
                             {chargementDonnees ? <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Chargement...</p> : mesPubs.length === 0 ? <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucune activité partagée.</p> : mesPubs.map(pub => (
                                 <div key={pub.ID} className="card post" style={{ position: 'relative', border: pub.Est_Epingle == 1 ? '1px solid var(--orange-primary)' : '1px solid var(--border-color)' }}>
 
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                                         <div>
                                             {pub.Est_Epingle == 1 && <div style={{ color: 'var(--orange-primary)', fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '0.3rem' }}>📌 Épinglé</div>}
                                             <span className="post-date" style={{ display: 'block', fontSize: '0.85rem' }}>{pub.Date_Publication}</span>
                                         </div>
-                                        <button onClick={() => handleEpingler(pub.ID)} style={{ background: 'transparent', border: '1px solid var(--orange-primary)', color: 'var(--orange-primary)', padding: '0.3rem 0.6rem', borderRadius: '15px', fontSize: '0.75rem', cursor: 'pointer' }}>
-                                            {pub.Est_Epingle == 1 ? 'Désépingler' : '📌 Épingler'}
-                                        </button>
+                                        
+                                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                            {idPostEnEdition !== pub.ID && (
+                                                <React.Fragment>
+                                                    <button onClick={() => activerEditionInline(pub)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>Modifier</button>
+                                                    <button onClick={() => { setIdPostEnSuppression(pub.ID); setIdPostEnEdition(null); }} style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>Supprimer</button>
+                                                </React.Fragment>
+                                            )}
+                                            <button onClick={() => handleEpingler(pub.ID)} style={{ background: 'transparent', border: '1px solid var(--orange-primary)', color: 'var(--orange-primary)', padding: '0.3rem 0.6rem', borderRadius: '15px', fontSize: '0.75rem', cursor: 'pointer' }}>
+                                                {pub.Est_Epingle == 1 ? 'Désépingler' : '📌 Épingler'}
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{pub.Contenu}</p>
+                                    {idPostEnSuppression === pub.ID && (
+                                        <div style={{ backgroundColor: 'rgba(220, 53, 69, 0.1)', border: '1px solid #dc3545', padding: '0.8rem', borderRadius: '8px', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>Supprimer définitivement ce post ?</span>
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <button className="btn-primary" style={{ backgroundColor: 'var(--border-color)', color: 'var(--text-light)', padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={() => setIdPostEnSuppression(null)}>Annuler</button>
+                                                <button className="btn-primary" style={{ backgroundColor: '#dc3545', color: 'white', padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={() => validerSuppressionInline(pub.ID)}>Supprimer</button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {idPostEnEdition === pub.ID ? (
+                                        <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            <textarea value={texteEdition} onChange={(e) => setTexteEdition(e.target.value)} rows="3" style={{ fontSize: '0.95rem', padding: '0.6rem' }} />
+                                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                                <button className="btn-primary" style={{ backgroundColor: 'var(--border-color)', color: 'var(--text-light)', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setIdPostEnEdition(null)}>Annuler</button>
+                                                <button className="btn-primary" style={{ backgroundColor: '#28a745', color: 'white', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => validerModificationInline(pub.ID)}>Enregistrer</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{pub.Contenu}</p>
+                                    )}
 
                                     {pub.Media_URL && (
                                         <div style={{ textAlign: 'center', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden', marginBottom: '1rem' }}>
@@ -694,7 +755,7 @@
             );
         }
 
-        // --- COMPOSANT ÉVÉNEMENTS (Correction du mode clair pour le calendrier et bouton) ---
+        // --- COMPOSANT ÉVÉNEMENTS (Calendrier avec pastilles et scroll automatique) ---
         function Evenements({ utilisateurConnecte, modalOuverte, fermerModal }) {
             const [listeEvenements, setListeEvenements] = React.useState([]);
             const [mesEvenements, setMesEvenements] = React.useState([]);
@@ -719,6 +780,14 @@
 
             const handleCreer = (e) => {
                 e.preventDefault();
+
+                const dateChoisie = new Date(nouveauEvt.date);
+                const dateActuelle = new Date();
+                if (dateChoisie < dateActuelle) {
+                    alert("❌ Action refusée : Vous ne pouvez pas créer un événement à une date passée.");
+                    return;
+                }
+
                 fetch("../Backend/creer_evenement.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -760,6 +829,20 @@
                     .catch(err => alert("Erreur réseau : " + err));
             };
 
+            // SCROLL AUTOMATIQUE VERS LA CARTE
+            const scrollToEvent = (id) => {
+                const element = document.getElementById(`evt-${id}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Petit effet de clignotement pour indiquer l'événement trouvé
+                    element.style.transition = "box-shadow 0.3s ease";
+                    element.style.boxShadow = "0 0 15px var(--orange-primary)";
+                    setTimeout(() => {
+                        element.style.boxShadow = "none";
+                    }, 1500);
+                }
+            };
+
             const moisActuel = dateCalendrier.getMonth();
             const anneeActuelle = dateCalendrier.getFullYear();
             const nomsMois = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
@@ -777,11 +860,34 @@
             const getEvenementsDuJour = (jour) => {
                 if (!jour) return [];
                 const dateStr = `${anneeActuelle}-${String(moisActuel + 1).padStart(2, '0')}-${String(jour).padStart(2, '0')}`;
-                return mesEvenements.filter(e => e.Date_Evenement && e.Date_Evenement.startsWith(dateStr));
+                return listeEvenements.filter(e => {
+                    const dateBrute = e.Date_evenement || e.Date_Evenement || e.date;
+                    return dateBrute && dateBrute.startsWith(dateStr);
+                });
             };
 
             const moisPrecedent = () => setDateCalendrier(new Date(anneeActuelle, moisActuel - 1, 1));
             const moisSuivant = () => setDateCalendrier(new Date(anneeActuelle, moisActuel + 1, 1));
+
+            const formaterDateCourte = (dateSql) => {
+                if (!dateSql) return "";
+                try {
+                    const cleanDate = dateSql.replace('T', ' ');
+                    const parts = cleanDate.split(' ');
+                    const dParts = parts[0].split('-');
+                    if (dParts.length === 3) {
+                        const heure = parts.length > 1 ? parts[1].substring(0, 5) : "";
+                        return heure ? `${dParts[2]}/${dParts[1]} à ${heure}` : `${dParts[2]}/${dParts[1]}`;
+                    }
+                    return dateSql;
+                } catch (e) { return dateSql; }
+            };
+
+            const obtenirDateMinimale = () => {
+                const maintenant = new Date();
+                maintenant.setMinutes(maintenant.getMinutes() - maintenant.getTimezoneOffset());
+                return maintenant.toISOString().slice(0, 16);
+            };
 
             return (
                 <div>
@@ -792,7 +898,16 @@
                                 <h3 style={{ marginTop: 0, color: 'var(--orange-primary)' }}>Créer un Événement</h3>
                                 <form onSubmit={handleCreer} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                     <input type="text" placeholder="Titre de l'événement..." value={nouveauEvt.titre} onChange={e => setNouveauEvt({ ...nouveauEvt, titre: e.target.value })} required />
-                                    <input type="datetime-local" value={nouveauEvt.date} onChange={e => setNouveauEvt({ ...nouveauEvt, date: e.target.value })} required style={{ padding: '0.8rem', backgroundColor: 'var(--bg-dark)', color: 'var(--text-light)', border: '1px solid var(--border-color)', borderRadius: '8px' }} />
+                                    
+                                    <input 
+                                        type="datetime-local" 
+                                        value={nouveauEvt.date} 
+                                        min={obtenirDateMinimale()} 
+                                        onChange={e => setNouveauEvt({ ...nouveauEvt, date: e.target.value })} 
+                                        required 
+                                        style={{ padding: '0.8rem', backgroundColor: 'var(--bg-dark)', color: 'var(--text-light)', border: '1px solid var(--border-color)', borderRadius: '8px' }} 
+                                    />
+                                    
                                     <input type="text" placeholder="Lieu (Ville, Salle, Parc...)" value={nouveauEvt.lieu} onChange={e => setNouveauEvt({ ...nouveauEvt, lieu: e.target.value })} required />
                                     <textarea placeholder="Description, programme, prérequis..." value={nouveauEvt.description} onChange={e => setNouveauEvt({ ...nouveauEvt, description: e.target.value })} rows="4" required />
                                     <button type="submit" className="btn-primary">Publier l'événement</button>
@@ -801,60 +916,79 @@
                         </div>
                     )}
 
-                    {utilisateurConnecte && (
-                        <div className="card" style={{ marginBottom: '2rem', padding: '1rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                                <button onClick={moisPrecedent} style={{ background: 'none', border: 'none', color: 'var(--orange-primary)', cursor: 'pointer', fontSize: '1.2rem' }}>◀</button>
-                                <h3 style={{ margin: 0, color: 'var(--text-light)' }}>Mon Calendrier : {nomsMois[moisActuel]} {anneeActuelle}</h3>
-                                <button onClick={moisSuivant} style={{ background: 'none', border: 'none', color: 'var(--orange-primary)', cursor: 'pointer', fontSize: '1.2rem' }}>▶</button>
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', marginBottom: '0.5rem' }}>
-                                {joursSemaine.map(j => <strong key={j} style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{j}</strong>)}
-                            </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
-                                {cellulesCalendrier.map((jour, index) => {
-                                    const evts = getEvenementsDuJour(jour);
-                                    const estAujourdhui = jour === new Date().getDate() && moisActuel === new Date().getMonth() && anneeActuelle === new Date().getFullYear();
-
-                                    return (
-                                        <div key={index} style={{
-                                            minHeight: '80px',
-                                            backgroundColor: 'var(--bg-dark)',
-                                            border: estAujourdhui ? '1px solid var(--orange-primary)' : '1px solid var(--border-color)',
-                                            borderRadius: '6px',
-                                            padding: '4px',
-                                            display: 'flex',
-                                            flexDirection: 'column'
-                                        }}>
-                                            <span style={{ fontSize: '0.85rem', color: estAujourdhui ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: estAujourdhui ? 'bold' : 'normal', alignSelf: 'flex-end' }}>
-                                                {jour}
-                                            </span>
-
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
-                                                {evts.map(e => (
-                                                    <div key={e.ID} style={{
-                                                        backgroundColor: 'var(--orange-primary)',
-                                                        color: 'white',
-                                                        fontSize: '0.7rem',
-                                                        padding: '2px 4px',
-                                                        borderRadius: '4px',
-                                                        whiteSpace: 'nowrap',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
-                                                        fontWeight: 'bold'
-                                                    }} title={`${e.Titre} - ${e.Lieu}`}>
-                                                        {e.Titre}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                    <div className="card" style={{ marginBottom: '2rem', padding: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <button onClick={moisPrecedent} style={{ background: 'none', border: 'none', color: 'var(--orange-primary)', cursor: 'pointer', fontSize: '1.2rem' }}>◀</button>
+                            <h3 style={{ margin: 0, color: 'var(--text-light)' }}>Calendrier : {nomsMois[moisActuel]} {anneeActuelle}</h3>
+                            <button onClick={moisSuivant} style={{ background: 'none', border: 'none', color: 'var(--orange-primary)', cursor: 'pointer', fontSize: '1.2rem' }}>▶</button>
                         </div>
-                    )}
+
+                        {/* Légende mise à jour avec le style "pastilles" */}
+                        {utilisateurConnecte && (
+                            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', marginBottom: '1.5rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <span style={{ width: '12px', height: '12px', backgroundColor: 'var(--orange-primary)', borderRadius: '50%' }}></span> Inscrit
+                                </span>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <span style={{ width: '12px', height: '12px', backgroundColor: 'transparent', border: '2px solid #28a745', borderRadius: '50%' }}></span> Disponible
+                                </span>
+                            </div>
+                        )}
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', marginBottom: '0.5rem' }}>
+                            {joursSemaine.map(j => <strong key={j} style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{j}</strong>)}
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
+                            {cellulesCalendrier.map((jour, index) => {
+                                const evts = getEvenementsDuJour(jour);
+                                const estAujourdhui = jour === new Date().getDate() && moisActuel === new Date().getMonth() && anneeActuelle === new Date().getFullYear();
+
+                                return (
+                                    <div key={index} style={{
+                                        minHeight: '80px',
+                                        backgroundColor: 'var(--bg-dark)',
+                                        border: estAujourdhui ? '1px solid var(--orange-primary)' : '1px solid var(--border-color)',
+                                        borderRadius: '6px',
+                                        padding: '6px',
+                                        display: 'flex',
+                                        flexDirection: 'column'
+                                    }}>
+                                        <span style={{ fontSize: '0.85rem', color: estAujourdhui ? 'var(--orange-primary)' : 'var(--text-muted)', fontWeight: estAujourdhui ? 'bold' : 'normal', alignSelf: 'flex-start', marginBottom: '4px' }}>
+                                            {jour}
+                                        </span>
+
+                                        {/* Affichage des pastilles */}
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: 'auto', justifyContent: 'flex-end' }}>
+                                            {evts.map(e => {
+                                                const estInscrit = utilisateurConnecte && mesEvenements.some(m => m.ID == e.ID);
+                                                const dateBrute = e.Date_evenement || e.Date_Evenement || e.date;
+                                                const heure = dateBrute ? dateBrute.split(' ')[1].substring(0, 5) : "";
+                                                
+                                                return (
+                                                    <div 
+                                                        key={e.ID} 
+                                                        onClick={() => scrollToEvent(e.ID)}
+                                                        style={{
+                                                            backgroundColor: estInscrit ? 'var(--orange-primary)' : 'transparent',
+                                                            border: estInscrit ? 'none' : '2px solid #28a745',
+                                                            width: '14px',
+                                                            height: '14px',
+                                                            borderRadius: '50%',
+                                                            cursor: 'pointer',
+                                                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                                                        }} 
+                                                        title={`${heure} - ${e.Titre} (Cliquez pour voir)`}
+                                                    >
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
 
                     <h2 style={{ color: 'var(--orange-primary)', marginBottom: '1rem' }}>Tous les Événements</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -864,22 +998,22 @@
                             <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Aucun événement à venir.</p>
                         ) : (
                             listeEvenements.map(evt => {
-                                const estInscrit = mesEvenements.some(m => m.ID == evt.ID);
+                                const estInscrit = utilisateurConnecte && mesEvenements.some(m => m.ID == evt.ID);
 
                                 return (
-                                    <div key={evt.ID} className="card" style={{ borderLeft: '4px solid #28a745' }}>
+                                    <div id={`evt-${evt.ID}`} key={evt.ID} className="card" style={{ borderLeft: '4px solid #28a745', scrollMarginTop: '90px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                             <div>
                                                 <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-light)' }}>{evt.Titre}</h3>
                                                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-                                                    <span>📅 {evt.Date_Evenement}</span> • <span>📍 {evt.Lieu}</span>
+                                                    <span>📅 {evt.Date_Formatee}</span> • <span>📍 {evt.Lieu}</span>
                                                 </div>
                                                 <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-light)' }}>{evt.Description}</p>
                                             </div>
                                         </div>
 
                                         <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Organisé par <strong>{evt.Organisateur_Nom}</strong></span>
+                                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Organisé par <strong>{evt.Createur || evt.Organisateur_Nom}</strong></span>
                                             <button
                                                 onClick={() => handleRejoindre(evt.ID)}
                                                 className="btn-primary"
@@ -1062,11 +1196,14 @@
                 </div>
             );
         }
-        // --- COMPOSANT COMMUNAUTÉS ---
+        // --- COMPOSANT COMMUNAUTÉS (Avec système de vote persistant et limité) ---
         function Communautes({ utilisateurConnecte, modalOuverte, fermerModal }) {
             const [listeCommunautes, setListeCommunautes] = React.useState([]);
             const [communauteActive, setCommunauteActive] = React.useState(null);
             const [discussions, setDiscussions] = React.useState([]);
+
+            // État pour mémoriser les votes de l'utilisateur actif
+            const [mesVotes, setMesVotes] = React.useState({});
 
             const [vueModeration, setVueModeration] = React.useState(false);
             const [ongletAdmin, setOngletAdmin] = React.useState('demandes');
@@ -1092,7 +1229,9 @@
 
             const chargerDiscussions = (id) => {
                 fetch(`../Backend/get_discussions.php?communaute_id=${id}`)
-                    .then(r => r.json()).then(data => setDiscussions(data.erreur ? [] : data));
+                    .then(r => r.json()).then(data => {
+                        setDiscussions(data.erreur ? [] : data);
+                    });
             };
 
             const chargerMembresAdmin = (id) => {
@@ -1135,7 +1274,7 @@
             };
 
             const handlePromouvoir = (cibleId, cibleNom) => {
-                if (!confirm(`Voulez-vous vraiment nommer ${cibleNom} modérateur de ce groupe ?`)) return;
+                if (!window.confirm(`Voulez-vous vraiment nommer ${cibleNom} modérateur de ce groupe ?`)) return;
                 fetch("../Backend/promouvoir_moderateur.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1207,14 +1346,48 @@
                     .catch(err => console.error("Erreur :", err));
             };
 
-            const simulerVote = (id, valeur) => {
+            // LOGIQUE DE VOTE AVEC ENREGISTREMENT EN BASE DE DONNÉES
+            const gererVote = (idDiscussion, valeurSouhaitee) => {
                 if (!utilisateurConnecte || communauteActive.Statut_Membre !== 'Accepte') {
                     return alert("Vous devez être membre approuvé pour voter.");
                 }
+
+                const voteActuel = mesVotes[idDiscussion] || 0;
+                let nouveauVote = valeurSouhaitee;
+                let differenceScore = valeurSouhaitee;
+
+                // Annulation du vote si on reclique sur la même flèche
+                if (voteActuel === valeurSouhaitee) {
+                    nouveauVote = 0;
+                    differenceScore = -valeurSouhaitee;
+                } 
+                // Inversion du vote si on clique sur la flèche opposée
+                else if (voteActuel !== 0) {
+                    nouveauVote = valeurSouhaitee;
+                    differenceScore = valeurSouhaitee * 2;
+                }
+
+                // 1. Mise à jour instantanée de l'interface (Optimiste)
+                setMesVotes({ ...mesVotes, [idDiscussion]: nouveauVote });
+
                 setDiscussions(discussions.map(d => {
-                    if (d.ID === id) return { ...d, Score: parseInt(d.Score) + valeur };
+                    if (d.ID === idDiscussion) {
+                        return { ...d, Score: parseInt(d.Score || 0) + differenceScore };
+                    }
                     return d;
                 }));
+
+                // 2. Envoi en arrière-plan vers le serveur PHP
+                fetch("../Backend/voter_discussion.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ discussion_id: idDiscussion, utilisateur_id: utilisateurConnecte.ID, valeur: nouveauVote })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.erreur) console.error("Erreur de sauvegarde du vote :", data.erreur);
+                })
+                .catch(err => console.error("Erreur réseau lors du vote :", err));
             };
 
             return (
@@ -1382,29 +1555,40 @@
                             {discussions.length === 0 ? (
                                 <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '2rem' }}>Aucun sujet ouvert pour l'instant.</p>
                             ) : (
-                                discussions.map(disc => (
-                                    <div key={disc.ID} className="card" style={{ display: 'flex', gap: '1rem', padding: '1rem' }}>
-                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
-                                            <button onClick={() => simulerVote(disc.ID, 1)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}>▲</button>
-                                            <span style={{ fontWeight: 'bold', color: disc.Score > 0 ? 'var(--orange-primary)' : 'var(--text-light)' }}>{disc.Score}</span>
-                                            <button onClick={() => simulerVote(disc.ID, -1)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}>▼</button>
-                                        </div>
+                                discussions.map(disc => {
+                                    // Détermination de la couleur selon le vote actuel mémorisé
+                                    const vote = mesVotes[disc.ID] || 0;
+                                    const flecheHautCouleur = vote === 1 ? 'var(--orange-primary)' : 'var(--text-muted)';
+                                    const flecheBasCouleur = vote === -1 ? '#dc3545' : 'var(--text-muted)';
+                                    
+                                    let scoreCouleur = 'var(--text-light)';
+                                    if (disc.Score > 0) scoreCouleur = 'var(--orange-primary)';
+                                    if (disc.Score < 0) scoreCouleur = '#dc3545';
 
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
-                                                Posté par <strong style={{ color: 'var(--text-light)' }}>{disc.Auteur}</strong> • {disc.DateF}
+                                    return (
+                                        <div key={disc.ID} className="card" style={{ display: 'flex', gap: '1rem', padding: '1rem' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
+                                                <button onClick={() => gererVote(disc.ID, 1)} style={{ background: 'none', border: 'none', color: flecheHautCouleur, cursor: 'pointer', fontSize: '1.2rem', transition: 'color 0.2s' }}>▲</button>
+                                                <span style={{ fontWeight: 'bold', color: scoreCouleur }}>{disc.Score}</span>
+                                                <button onClick={() => gererVote(disc.ID, -1)} style={{ background: 'none', border: 'none', color: flecheBasCouleur, cursor: 'pointer', fontSize: '1.2rem', transition: 'color 0.2s' }}>▼</button>
                                             </div>
-                                            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>{disc.Titre}</h3>
-                                            <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: '1.4', color: 'var(--text-light)' }}>{disc.Contenu}</p>
 
-                                            {communauteActive.Statut_Membre === 'Accepte' && (
-                                                <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem' }}>
-                                                    <span style={{ fontSize: '0.85rem', color: 'var(--orange-primary)', cursor: 'pointer', fontWeight: 'bold' }}>💬 Répondre</span>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.4rem' }}>
+                                                    Posté par <strong style={{ color: 'var(--text-light)' }}>{disc.Auteur}</strong> • {disc.DateF}
                                                 </div>
-                                            )}
+                                                <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem' }}>{disc.Titre}</h3>
+                                                <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: '1.4', color: 'var(--text-light)' }}>{disc.Contenu}</p>
+
+                                                {communauteActive.Statut_Membre === 'Accepte' && (
+                                                    <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem' }}>
+                                                        <span style={{ fontSize: '0.85rem', color: 'var(--orange-primary)', cursor: 'pointer', fontWeight: 'bold' }}>💬 Répondre</span>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))
+                                    );
+                                })
                             )}
                         </React.Fragment>
                     )}
@@ -1618,7 +1802,7 @@
             );
         }
 
-        // --- COMPOSANT FIL D'ACTUALITÉ ---
+        // --- COMPOSANT FIL D'ACTUALITÉ (Avec zone de commentaires intégrée) ---
         function FilActualite({ utilisateurConnecte, ouvrirProfil, modalOuverte, fermerModal }) {
             const [nouveauMessage, setNouveauMessage] = React.useState("");
             const [fichierMedia, setFichierMedia] = React.useState(null);
@@ -1628,6 +1812,7 @@
 
             const [commentairesOuverts, setCommentairesOuverts] = React.useState(null);
             const [listeCommentaires, setListeCommentaires] = React.useState([]);
+            const [nouveauCommentaire, setNouveauCommentaire] = React.useState(""); // NOUVEAU
 
             const [idPostEnEdition, setIdPostEnEdition] = React.useState(null);
             const [texteEdition, setTexteEdition] = React.useState("");
@@ -1643,7 +1828,15 @@
                 const userId = utilisateurConnecte ? utilisateurConnecte.ID : 0;
                 fetch(`../Backend/get_publications.php?user_id=${userId}&flux=${fluxActif}`)
                     .then(res => res.json())
-                    .then(data => { if (!data.erreur) setPublications(data); setChargement(false); });
+                    .then(data => { 
+                        if (!data.erreur) {
+                            const pubsFiltrees = utilisateurConnecte 
+                                ? data.filter(pub => pub.Auteur_ID !== utilisateurConnecte.ID)
+                                : data;
+                            setPublications(pubsFiltrees); 
+                        }
+                        setChargement(false); 
+                    });
             };
 
             React.useEffect(() => { chargerPublications(); }, [fluxActif, utilisateurConnecte]);
@@ -1659,14 +1852,45 @@
                     .then(res => res.json())
                     .then(data => {
                         if (data.erreur) alert("❌ " + data.erreur);
-                        else { setNouveauMessage(""); setFichierMedia(null); fermerModal(); chargerPublications(); }
+                        else { 
+                            setNouveauMessage(""); setFichierMedia(null); fermerModal(); 
+                            alert("✅ Performance publiée avec succès ! (Visible dans votre Profil)");
+                            chargerPublications(); 
+                        }
                     });
+            };
+
+            // --- NOUVELLE FONCTION : AJOUTER UN COMMENTAIRE ---
+            const handleAjouterCommentaire = (e, pubId) => {
+                e.preventDefault();
+                if (!nouveauCommentaire.trim()) return;
+                
+                fetch("../Backend/ajouter_commentaire.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        publication_id: pubId,
+                        auteur_id: utilisateurConnecte.ID,
+                        contenu: nouveauCommentaire
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.erreur) alert(data.erreur);
+                    else {
+                        setNouveauCommentaire(""); // Vide le champ
+                        // Rafraîchit les commentaires de cette publication spécifique
+                        fetch(`../Backend/get_commentaires.php?pub_id=${pubId}`)
+                            .then(res => res.json())
+                            .then(d => setListeCommentaires(d));
+                    }
+                });
             };
 
             const activerEditionInline = (pub) => {
                 setIdPostEnEdition(pub.ID);
                 setTexteEdition(pub.Contenu);
-                setIdPostEnSuppression(null); setIdPostEnSignalement(null); setPubAPartager(null);
+                setIdPostEnSuppression(null); setIdPostEnSignalement(null); setPubAPartager(null); setCommentairesOuverts(null);
             };
 
             const validerModificationInline = (pubId) => {
@@ -1695,10 +1919,10 @@
             };
 
             const ouvrirSignalement = (pub) => {
-                if (!utilisateurConnecte) return alert("Veuillez vous connecter pour signaler.");
+                if (!utilisateurConnecte) return alert("Veuillez vous connecter pour signaler un contenu.");
                 setIdPostEnSignalement(idPostEnSignalement === pub.ID ? null : pub.ID);
                 setMotifSignalement("");
-                setPubAPartager(null); setIdPostEnEdition(null); setIdPostEnSuppression(null);
+                setPubAPartager(null); setIdPostEnEdition(null); setIdPostEnSuppression(null); setCommentairesOuverts(null);
             };
 
             const validerSignalement = (pubId) => {
@@ -1715,9 +1939,9 @@
             };
 
             const ouvrirPartage = (pub) => {
-                if (!utilisateurConnecte) return alert("Connectez-vous pour partager.");
+                if (!utilisateurConnecte) return alert("Veuillez vous connecter pour partager cette performance.");
                 setPubAPartager(pubAPartager === pub.ID ? null : pub.ID);
-                setIdPostEnSignalement(null); setIdPostEnEdition(null); setIdPostEnSuppression(null);
+                setIdPostEnSignalement(null); setIdPostEnEdition(null); setIdPostEnSuppression(null); setCommentairesOuverts(null);
                 if (pubAPartager !== pub.ID) {
                     fetch("../Backend/get_utilisateurs.php")
                         .then(res => res.json())
@@ -1769,12 +1993,7 @@
 
                                 <div className="post-header">
                                     <span className="post-author" onClick={() => ouvrirProfil(pub.Auteur_ID)} style={{ cursor: 'pointer', textDecoration: 'underline' }}>{pub.Nom}</span>
-                                    {utilisateurConnecte && utilisateurConnecte.ID === pub.Auteur_ID && idPostEnEdition !== pub.ID ? (
-                                        <div style={{ display: 'flex', gap: '0.6rem' }}>
-                                            <button onClick={() => activerEditionInline(pub)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>Modifier</button>
-                                            <button onClick={() => { setIdPostEnSuppression(pub.ID); setIdPostEnEdition(null); setIdPostEnSignalement(null); setPubAPartager(null); }} style={{ background: 'none', border: 'none', color: '#dc3545', cursor: 'pointer', fontSize: '0.8rem', textDecoration: 'underline' }}>Supprimer</button>
-                                        </div>
-                                    ) : utilisateurConnecte && utilisateurConnecte.ID !== pub.Auteur_ID && (
+                                    {utilisateurConnecte && utilisateurConnecte.ID !== pub.Auteur_ID && (
                                         <button onClick={() => fetch("../Backend/suivre_utilisateur.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ suiveur_id: utilisateurConnecte.ID, suivi_id: pub.Auteur_ID }) }).then(() => chargerPublications())}
                                             style={{
                                                 backgroundColor: pub.EstAbonne ? 'var(--border-color)' : 'transparent',
@@ -1823,14 +2042,78 @@
                                 )}
 
                                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', flexWrap: 'wrap' }}>
-                                    <button className="btn-like" onClick={() => fetch("../Backend/liker_publication.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publication_id: pub.ID, utilisateur_id: utilisateurConnecte.ID }) }).then(() => chargerPublications())}>🔥 Respect {pub.NbLikes > 0 && `(${pub.NbLikes})`}</button>
-                                    <button className="btn-like" onClick={() => { if (commentairesOuverts === pub.ID) setCommentairesOuverts(null); else { setCommentairesOuverts(pub.ID); fetch(`../Backend/get_commentaires.php?pub_id=${pub.ID}`).then(res => res.json()).then(d => setListeCommentaires(d)); } }}>💬 Commenter</button>
-                                    <button className="btn-like" style={{ borderColor: pubAPartager === pub.ID ? 'var(--orange-primary)' : '', color: pubAPartager === pub.ID ? 'var(--orange-primary)' : '' }} onClick={() => ouvrirPartage(pub)}>🔗 Partager</button>
+                                    <button className="btn-like" onClick={() => {
+                                        if (!utilisateurConnecte) return alert("Veuillez vous connecter pour lâcher un Respect.");
+                                        fetch("../Backend/liker_publication.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publication_id: pub.ID, utilisateur_id: utilisateurConnecte.ID }) }).then(() => chargerPublications());
+                                    }}>
+                                        🔥 Respect {pub.NbLikes > 0 && `(${pub.NbLikes})`}
+                                    </button>
+                                    
+                                    <button className="btn-like" style={{ borderColor: commentairesOuverts === pub.ID ? 'var(--orange-primary)' : '', color: commentairesOuverts === pub.ID ? 'var(--orange-primary)' : '' }} onClick={() => { 
+                                        if (!utilisateurConnecte) return alert("Veuillez vous connecter pour commenter cette publication.");
+                                        if (commentairesOuverts === pub.ID) setCommentairesOuverts(null); 
+                                        else { 
+                                            setCommentairesOuverts(pub.ID); 
+                                            setNouveauCommentaire("");
+                                            fetch(`../Backend/get_commentaires.php?pub_id=${pub.ID}`).then(res => res.json()).then(d => setListeCommentaires(d)); 
+                                            setPubAPartager(null); setIdPostEnSignalement(null);
+                                        } 
+                                    }}>
+                                        💬 Commenter
+                                    </button>
+                                    
+                                    <button className="btn-like" style={{ borderColor: pubAPartager === pub.ID ? 'var(--orange-primary)' : '', color: pubAPartager === pub.ID ? 'var(--orange-primary)' : '' }} onClick={() => ouvrirPartage(pub)}>
+                                        🔗 Partager
+                                    </button>
+                                    
                                     {utilisateurConnecte && utilisateurConnecte.ID !== pub.Auteur_ID && (
-                                        <button className="btn-like" style={{ borderColor: idPostEnSignalement === pub.ID ? '#dc3545' : '', color: idPostEnSignalement === pub.ID ? '#dc3545' : '' }} onClick={() => ouvrirSignalement(pub)}>⚠️ Signaler</button>
+                                        <button className="btn-like" style={{ borderColor: idPostEnSignalement === pub.ID ? '#dc3545' : '', color: idPostEnSignalement === pub.ID ? '#dc3545' : '' }} onClick={() => ouvrirSignalement(pub)}>
+                                            ⚠️ Signaler
+                                        </button>
                                     )}
                                 </div>
 
+                                {/* --- ZONE DES COMMENTAIRES --- */}
+                                {commentairesOuverts === pub.ID && (
+                                    <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--bg-dark)', borderRadius: '8px', borderTop: '1px solid var(--border-color)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                            <strong style={{ color: 'var(--text-light)' }}>Commentaires</strong>
+                                            <button onClick={() => setCommentairesOuverts(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1rem' }}>✖</button>
+                                        </div>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: '1rem', maxHeight: '300px', overflowY: 'auto' }}>
+                                            {listeCommentaires.length === 0 ? (
+                                                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>Aucun commentaire pour le moment. Soyez le premier !</p>
+                                            ) : (
+                                                listeCommentaires.map(c => (
+                                                    <div key={c.ID} style={{ padding: '0.8rem', backgroundColor: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                                                            <strong style={{ fontSize: '0.85rem', color: 'var(--orange-primary)' }}>{c.Nom}</strong>
+                                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{c.Date_Commentaire}</span>
+                                                        </div>
+                                                        <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-light)' }}>{c.Contenu}</p>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+
+                                        {utilisateurConnecte && (
+                                            <form onSubmit={(e) => handleAjouterCommentaire(e, pub.ID)} style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Votre commentaire..."
+                                                    value={nouveauCommentaire}
+                                                    onChange={(e) => setNouveauCommentaire(e.target.value)}
+                                                    style={{ flex: 1, padding: '0.6rem 1rem', borderRadius: '25px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-light)' }}
+                                                    required
+                                                />
+                                                <button type="submit" className="btn-primary" style={{ padding: '0.6rem 1.5rem', borderRadius: '25px', fontSize: '0.8rem' }}>Envoyer</button>
+                                            </form>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* MENU PARTAGE */}
                                 {pubAPartager === pub.ID && (
                                     <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--bg-dark)', borderRadius: '8px', border: '1px solid var(--orange-primary)' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
@@ -1857,6 +2140,7 @@
                                     </div>
                                 )}
 
+                                {/* MENU SIGNALEMENT */}
                                 {idPostEnSignalement === pub.ID && (
                                     <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'rgba(220, 53, 69, 0.05)', borderRadius: '8px', border: '1px dashed #dc3545' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}><strong style={{ color: '#dc3545', fontSize: '0.9rem' }}>Signaler :</strong><button onClick={() => setIdPostEnSignalement(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>✖</button></div>
@@ -1873,7 +2157,7 @@
                 </div>
             );
         }
-        // --- COMPOSANT PROFIL PUBLIC (Vue pour les visiteurs) ---
+        // --- COMPOSANT PROFIL PUBLIC (Vue pour les visiteurs avec bouton instantané) ---
         function ProfilPublic({ id, visiteur, fermer, demarrerDiscussion }) {
             const [data, setData] = React.useState(null);
             const [chargement, setChargement] = React.useState(true);
@@ -1894,15 +2178,37 @@
 
             const handleActionAbonnement = () => {
                 if (!visiteur) return alert("Veuillez vous connecter pour vous abonner.");
+                
+                // 1. MISE À JOUR OPTIMISTE (Changement immédiat à l'écran)
+                setData(prevData => {
+                    const estDejaAbonne = prevData.utilisateur.EstAbonne;
+                    return {
+                        ...prevData,
+                        utilisateur: {
+                            ...prevData.utilisateur,
+                            EstAbonne: !estDejaAbonne, // On inverse l'état instantanément
+                            NbAbonnes: estDejaAbonne 
+                                ? Math.max(0, parseInt(prevData.utilisateur.NbAbonnes) - 1) 
+                                : parseInt(prevData.utilisateur.NbAbonnes) + 1
+                        }
+                    };
+                });
+
+                // 2. ENVOI AU SERVEUR EN ARRIÈRE-PLAN
                 fetch("../Backend/suivre_utilisateur.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ suiveur_id: visiteur.ID, suivi_id: id })
                 })
-                    .then(res => res.json())
-                    .then(d => {
-                        if (!d.erreur) chargerProfil();
-                    });
+                .then(res => res.json())
+                .then(d => {
+                    // Si le serveur renvoie une erreur, on recharge les vraies données pour corriger l'affichage
+                    if (d.erreur) {
+                        alert(d.erreur);
+                        chargerProfil(); 
+                    }
+                })
+                .catch(() => chargerProfil()); // Sécurité en cas de coupure réseau
             };
 
             const ouvrirSignalement = () => {
@@ -1961,7 +2267,11 @@
                                 <button
                                     onClick={handleActionAbonnement}
                                     className="btn-primary"
-                                    style={{ backgroundColor: u.EstAbonne ? '#333' : 'var(--orange-primary)', color: 'white', border: u.EstAbonne ? '1px solid var(--border-color)' : 'none' }}
+                                    style={{ 
+                                        backgroundColor: u.EstAbonne ? 'var(--border-color)' : 'var(--orange-primary)', 
+                                        color: u.EstAbonne ? 'var(--text-light)' : 'white', 
+                                        border: u.EstAbonne ? '1px solid var(--border-color)' : 'none' 
+                                    }}
                                 >
                                     {u.EstAbonne ? "Abonné ✓" : "+ Suivre"}
                                 </button>
@@ -1998,7 +2308,7 @@
                                         style={{ fontSize: '0.9rem', padding: '0.6rem', borderColor: '#dc3545' }}
                                     />
                                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                                        <button className="btn-primary" style={{ backgroundColor: '#333', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setModeSignalement(false)}>Annuler</button>
+                                        <button className="btn-primary" style={{ backgroundColor: 'var(--border-color)', color: 'var(--text-light)', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setModeSignalement(false)}>Annuler</button>
                                         <button className="btn-primary" style={{ backgroundColor: '#dc3545', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={validerSignalement}>Envoyer le signalement</button>
                                     </div>
                                 </div>
