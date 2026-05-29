@@ -378,19 +378,15 @@
         }
 
         /* === NOUVEAU LAYOUT MESSAGERIE (Adaptatif Clair/Sombre) === */
-        /* === LAYOUT MESSAGERIE AJUSTÉ (Largeur Max & Hauteur Dynamique) === */
         .messages-layout {
             display: grid;
-            grid-template-columns: 220px 1fr; /* Sidebar légèrement plus large */
+            grid-template-columns: 200px 1fr;
             gap: 1rem;
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: 12px;
-            /* Hauteur dynamique : occupe l'espace entre header (70px) et nav (70px) + marges */
-            height: calc(100vh - 190px); 
-            min-height: 400px;
+            height: 65vh;
             overflow: hidden;
-            width: 100%; /* Occupe toute la largeur disponible de la colonne */
         }
 
         .contacts-sidebar {
