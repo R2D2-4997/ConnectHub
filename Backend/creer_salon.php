@@ -1,27 +1,27 @@
 <?php
 require_once("config.php");
+// FIX CARACTÈRES SPÉCIAUX :
+mysqli_set_charset($conn, "utf8mb4");
+
 $data = json_decode(file_get_contents("php://input"));
-
-if (!empty($data->nom) && isset($data->createur_id) && !empty($data->membres)) {
+if (isset($data->nom) && isset($data->createur_id)) {
+    // Protection des apostrophes et caractères spéciaux
     $nom = mysqli_real_escape_string($conn, $data->nom);
-    $createur_id = (int)$data->createur_id;
-
-    // Créer le salon
-    mysqli_query($conn, "INSERT INTO salons_prives (Nom, Createur_ID) VALUES ('$nom', $createur_id)");
-    $salon_id = mysqli_insert_id($conn);
-
-    // Ajouter le créateur
-    mysqli_query($conn, "INSERT INTO membres_salons (Salon_ID, Utilisateur_ID) VALUES ($salon_id, $createur_id)");
-
-    // Ajouter les invités
-    foreach ($data->membres as $membre_id) {
-        $m_id = (int)$membre_id;
-        mysqli_query($conn, "INSERT IGNORE INTO membres_salons (Salon_ID, Utilisateur_ID) VALUES ($salon_id, $m_id)");
-    }
+    $createur = (int)$data->createur_id;
     
-    echo json_encode(["succes" => "Groupe créé avec succès !"]);
-} else {
-    echo json_encode(["erreur" => "Données incomplètes."]);
+    $sql = "INSERT INTO salons (Nom, Createur_ID) VALUES ('$nom', $createur)";
+    if (mysqli_query($conn, $sql)) {
+        $salon_id = mysqli_insert_id($conn);
+        $membres = isset($data->membres) ? $data->membres : [];
+        
+        // On boucle pour ajouter chaque membre coché + le créateur
+        foreach ($membres as $membre_id) {
+            $mid = (int)$membre_id;
+            mysqli_query($conn, "INSERT INTO membres_salons (Salon_ID, Utilisateur_ID) VALUES ($salon_id, $mid)");
+        }
+        echo json_encode(["succes" => "Groupe créé avec succès."]);
+    } else {
+        echo json_encode(["erreur" => "Erreur création : " . mysqli_error($conn)]);
+    }
 }
-mysqli_close($conn);
 ?>
