@@ -1196,7 +1196,7 @@
                 </div>
             );
         }
-        // --- COMPOSANT COMMUNAUTÉS (Avec système de vote persistant et limité) ---
+        // --- COMPOSANT COMMUNAUTÉS (Avec promotion et rétrogradation de modérateurs) ---
         function Communautes({ utilisateurConnecte, modalOuverte, fermerModal }) {
             const [listeCommunautes, setListeCommunautes] = React.useState([]);
             const [communauteActive, setCommunauteActive] = React.useState(null);
@@ -1289,6 +1289,30 @@
                     });
             };
 
+            // --- NOUVEAUTÉ : Fonction pour rétrograder avec sécurité ---
+            const handleRetrograder = (cibleId, cibleNom) => {
+                // Sécurité côté React : on compte le nombre de modérateurs
+                const nbModerateurs = listeMembres.filter(m => m.Role_Communaute === 'Moderateur').length;
+                if (nbModerateurs <= 1) {
+                    return alert("❌ Action impossible : Le Hub doit obligatoirement conserver au moins 1 modérateur actif.");
+                }
+
+                if (!window.confirm(`Voulez-vous vraiment retirer les droits de modération à ${cibleNom} ?`)) return;
+                
+                fetch("../Backend/retrograder_moderateur.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ communaute_id: communauteActive.ID, cible_id: cibleId, moderateur_id: utilisateurConnecte.ID })
+                })
+                    .then(res => res.json()).then(data => {
+                        if (data.erreur) alert("Erreur : " + data.erreur);
+                        else {
+                            alert("Succès : " + data.succes);
+                            chargerMembresAdmin(communauteActive.ID);
+                        }
+                    });
+            };
+
             React.useEffect(() => { chargerCommunautes(); }, [utilisateurConnecte]);
 
             const handleDemanderAdhesion = (e, id) => {
@@ -1346,7 +1370,6 @@
                     .catch(err => console.error("Erreur :", err));
             };
 
-            // LOGIQUE DE VOTE AVEC ENREGISTREMENT EN BASE DE DONNÉES
             const gererVote = (idDiscussion, valeurSouhaitee) => {
                 if (!utilisateurConnecte || communauteActive.Statut_Membre !== 'Accepte') {
                     return alert("Vous devez être membre approuvé pour voter.");
@@ -1356,18 +1379,15 @@
                 let nouveauVote = valeurSouhaitee;
                 let differenceScore = valeurSouhaitee;
 
-                // Annulation du vote si on reclique sur la même flèche
                 if (voteActuel === valeurSouhaitee) {
                     nouveauVote = 0;
                     differenceScore = -valeurSouhaitee;
                 } 
-                // Inversion du vote si on clique sur la flèche opposée
                 else if (voteActuel !== 0) {
                     nouveauVote = valeurSouhaitee;
                     differenceScore = valeurSouhaitee * 2;
                 }
 
-                // 1. Mise à jour instantanée de l'interface (Optimiste)
                 setMesVotes({ ...mesVotes, [idDiscussion]: nouveauVote });
 
                 setDiscussions(discussions.map(d => {
@@ -1377,7 +1397,6 @@
                     return d;
                 }));
 
-                // 2. Envoi en arrière-plan vers le serveur PHP
                 fetch("../Backend/voter_discussion.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -1524,12 +1543,21 @@
                                                             ({m.Role_Communaute})
                                                         </span>
                                                     </div>
-                                                    {m.Role_Communaute !== 'Moderateur' && (
+                                                    
+                                                    {/* BOUTONS PROMOUVOIR ET RÉTROGRADER */}
+                                                    {m.Role_Communaute !== 'Moderateur' ? (
                                                         <button
                                                             onClick={() => handlePromouvoir(m.ID, m.Nom)}
+                                                            style={{ backgroundColor: 'transparent', border: '1px solid #28a745', color: '#28a745', padding: '0.3rem 0.6rem', borderRadius: '15px', cursor: 'pointer', fontSize: '0.75rem' }}
+                                                        >
+                                                            Promouvoir Modérateur
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleRetrograder(m.ID, m.Nom)}
                                                             style={{ backgroundColor: 'transparent', border: '1px solid #dc3545', color: '#dc3545', padding: '0.3rem 0.6rem', borderRadius: '15px', cursor: 'pointer', fontSize: '0.75rem' }}
                                                         >
-                                                            Promouvoir
+                                                            Rétrograder
                                                         </button>
                                                     )}
                                                 </div>
@@ -1556,7 +1584,6 @@
                                 <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginTop: '2rem' }}>Aucun sujet ouvert pour l'instant.</p>
                             ) : (
                                 discussions.map(disc => {
-                                    // Détermination de la couleur selon le vote actuel mémorisé
                                     const vote = mesVotes[disc.ID] || 0;
                                     const flecheHautCouleur = vote === 1 ? 'var(--orange-primary)' : 'var(--text-muted)';
                                     const flecheBasCouleur = vote === -1 ? '#dc3545' : 'var(--text-muted)';
@@ -2157,13 +2184,25 @@
                 </div>
             );
         }
-        // --- COMPOSANT PROFIL PUBLIC (Vue pour les visiteurs avec bouton instantané) ---
+        // --- COMPOSANT PROFIL PUBLIC (Vue visiteurs avec interactions complètes sur les posts) ---
         function ProfilPublic({ id, visiteur, fermer, demarrerDiscussion }) {
             const [data, setData] = React.useState(null);
             const [chargement, setChargement] = React.useState(true);
 
+            // États pour le profil
             const [modeSignalement, setModeSignalement] = React.useState(false);
             const [motifSignalement, setMotifSignalement] = React.useState("");
+
+            // --- NOUVEAU : États pour interagir avec les publications ---
+            const [commentairesOuverts, setCommentairesOuverts] = React.useState(null);
+            const [listeCommentaires, setListeCommentaires] = React.useState([]);
+            const [nouveauCommentaire, setNouveauCommentaire] = React.useState("");
+
+            const [pubAPartager, setPubAPartager] = React.useState(null);
+            const [listeContacts, setListeContacts] = React.useState([]);
+
+            const [idPostEnSignalement, setIdPostEnSignalement] = React.useState(null);
+            const [motifSignalementPost, setMotifSignalementPost] = React.useState("");
 
             const chargerProfil = () => {
                 fetch(`../Backend/get_profil_public.php?id=${id}&visiteur=${visiteur ? visiteur.ID : 0}`)
@@ -2176,39 +2215,33 @@
 
             React.useEffect(() => { chargerProfil(); }, [id]);
 
+            // --- GESTION DU PROFIL ---
             const handleActionAbonnement = () => {
                 if (!visiteur) return alert("Veuillez vous connecter pour vous abonner.");
                 
-                // 1. MISE À JOUR OPTIMISTE (Changement immédiat à l'écran)
+                // Mise à jour optimiste
                 setData(prevData => {
                     const estDejaAbonne = prevData.utilisateur.EstAbonne;
                     return {
                         ...prevData,
                         utilisateur: {
                             ...prevData.utilisateur,
-                            EstAbonne: !estDejaAbonne, // On inverse l'état instantanément
+                            EstAbonne: !estDejaAbonne,
                             NbAbonnes: estDejaAbonne 
-                                ? Math.max(0, parseInt(prevData.utilisateur.NbAbonnes) - 1) 
-                                : parseInt(prevData.utilisateur.NbAbonnes) + 1
+                                ? Math.max(0, parseInt(prevData.utilisateur.NbAbonnes || 0) - 1) 
+                                : parseInt(prevData.utilisateur.NbAbonnes || 0) + 1
                         }
                     };
                 });
 
-                // 2. ENVOI AU SERVEUR EN ARRIÈRE-PLAN
                 fetch("../Backend/suivre_utilisateur.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ suiveur_id: visiteur.ID, suivi_id: id })
                 })
                 .then(res => res.json())
-                .then(d => {
-                    // Si le serveur renvoie une erreur, on recharge les vraies données pour corriger l'affichage
-                    if (d.erreur) {
-                        alert(d.erreur);
-                        chargerProfil(); 
-                    }
-                })
-                .catch(() => chargerProfil()); // Sécurité en cas de coupure réseau
+                .then(d => { if (d.erreur) { alert(d.erreur); chargerProfil(); } })
+                .catch(() => chargerProfil()); 
             };
 
             const ouvrirSignalement = () => {
@@ -2219,7 +2252,6 @@
 
             const validerSignalement = () => {
                 if (!motifSignalement.trim()) return alert("Veuillez préciser la raison du signalement.");
-
                 fetch("../Backend/signaler_utilisateur.php", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -2228,20 +2260,81 @@
                     .then(res => res.json())
                     .then(resData => {
                         if (resData.erreur) alert("❌ " + resData.erreur);
-                        else {
-                            alert("✅ " + resData.succes);
-                            setModeSignalement(false);
-                            setMotifSignalement("");
-                        }
+                        else { alert("✅ " + resData.succes); setModeSignalement(false); setMotifSignalement(""); }
                     });
+            };
+
+            // --- GESTION DES PUBLICATIONS ---
+            const handleLiker = (pubId) => {
+                if (!visiteur) return alert("Veuillez vous connecter pour lâcher un Respect.");
+                fetch("../Backend/liker_publication.php", { 
+                    method: "POST", 
+                    headers: { "Content-Type": "application/json" }, 
+                    body: JSON.stringify({ publication_id: pubId, utilisateur_id: visiteur.ID }) 
+                }).then(() => chargerProfil());
+            };
+
+            const handleAjouterCommentaire = (e, pubId) => {
+                e.preventDefault();
+                if (!nouveauCommentaire.trim()) return;
+                fetch("../Backend/ajouter_commentaire.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ publication_id: pubId, auteur_id: visiteur.ID, contenu: nouveauCommentaire })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.erreur) alert(data.erreur);
+                    else {
+                        setNouveauCommentaire("");
+                        fetch(`../Backend/get_commentaires.php?pub_id=${pubId}`)
+                            .then(res => res.json()).then(d => setListeCommentaires(d));
+                    }
+                });
+            };
+
+            const ouvrirPartage = (pub) => {
+                if (!visiteur) return alert("Veuillez vous connecter pour partager.");
+                setPubAPartager(pubAPartager === pub.ID ? null : pub.ID);
+                setIdPostEnSignalement(null); setCommentairesOuverts(null);
+                if (pubAPartager !== pub.ID) {
+                    fetch("../Backend/get_utilisateurs.php")
+                        .then(res => res.json())
+                        .then(d => { if (!d.erreur) setListeContacts(d.filter(u => u.ID !== visiteur.ID)); });
+                }
+            };
+
+            const envoyerPartage = (contactId, pub) => {
+                const lien = `\n\n--- Performance partagée ---\nDe : ${pub.Nom}\n"${pub.Contenu}"\n--------------------------`;
+                fetch("../Backend/envoyer_message.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ expediteur_id: visiteur.ID, destinataire_id: contactId, contenu: lien })
+                })
+                    .then(res => res.json()).then(d => { if (!d.erreur) { alert("✅ Partagé !"); setPubAPartager(null); } });
+            };
+
+            const ouvrirSignalementPost = (pub) => {
+                if (!visiteur) return alert("Veuillez vous connecter pour signaler.");
+                setIdPostEnSignalement(idPostEnSignalement === pub.ID ? null : pub.ID);
+                setMotifSignalementPost("");
+                setPubAPartager(null); setCommentairesOuverts(null);
+            };
+
+            const validerSignalementPost = (pubId) => {
+                if (!motifSignalementPost.trim()) return alert("Veuillez préciser la raison.");
+                fetch("../Backend/signaler_publication.php", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ publication_id: pubId, signaleur_id: visiteur.ID, motif: motifSignalementPost })
+                })
+                    .then(res => res.json()).then(d => { alert(d.succes || d.erreur); setIdPostEnSignalement(null); });
             };
 
             if (chargement) return <div className="card" style={{ textAlign: 'center' }}>Chargement du profil...</div>;
             if (!data || !data.utilisateur) return <div className="card" style={{ textAlign: 'center' }}>Profil introuvable. <button className="btn-primary" onClick={fermer}>Retour</button></div>;
 
             const u = data.utilisateur;
-
-            // Tri : Les posts épinglés par cet utilisateur remontent en premier
             const sortedPubs = [...data.publications].sort((a, b) => (b.Est_Epingle || 0) - (a.Est_Epingle || 0));
 
             return (
@@ -2330,9 +2423,10 @@
                                     <span className="post-date">{pub.Date_Publication}</span>
                                 </div>
                                 <p style={{ margin: '0 0 1rem 0', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>{pub.Contenu}</p>
+                                
                                 {pub.Media_URL && (
                                     <div style={{ marginBottom: '1rem', textAlign: 'center', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden' }}>
-                                        {pub.Media_URL.match(/\.(mp4|webm)$/i) ? (
+                                        {pub.Media_URL.match(/\.(mp4|webm|ogg)$/i) ? (
                                             <video controls style={{ maxWidth: '100%', maxHeight: '400px', display: 'block', margin: '0 auto' }}>
                                                 <source src={`../Backend/${pub.Media_URL}`} type={`video/${pub.Media_URL.split('.').pop()}`} />
                                             </video>
@@ -2341,7 +2435,111 @@
                                         )}
                                     </div>
                                 )}
-                                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>🔥 {pub.NbLikes} Respects</span>
+
+                                {/* --- BARRE D'INTERACTION --- */}
+                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', flexWrap: 'wrap' }}>
+                                    <button className="btn-like" onClick={() => handleLiker(pub.ID)}>
+                                        🔥 Respect {pub.NbLikes > 0 && `(${pub.NbLikes})`}
+                                    </button>
+                                    
+                                    <button className="btn-like" style={{ borderColor: commentairesOuverts === pub.ID ? 'var(--orange-primary)' : '', color: commentairesOuverts === pub.ID ? 'var(--orange-primary)' : '' }} onClick={() => { 
+                                        if (!visiteur) return alert("Veuillez vous connecter pour commenter cette publication.");
+                                        if (commentairesOuverts === pub.ID) setCommentairesOuverts(null); 
+                                        else { 
+                                            setCommentairesOuverts(pub.ID); 
+                                            setNouveauCommentaire("");
+                                            fetch(`../Backend/get_commentaires.php?pub_id=${pub.ID}`).then(res => res.json()).then(d => setListeCommentaires(d)); 
+                                            setPubAPartager(null); setIdPostEnSignalement(null);
+                                        } 
+                                    }}>
+                                        💬 Commenter
+                                    </button>
+                                    
+                                    <button className="btn-like" style={{ borderColor: pubAPartager === pub.ID ? 'var(--orange-primary)' : '', color: pubAPartager === pub.ID ? 'var(--orange-primary)' : '' }} onClick={() => ouvrirPartage(pub)}>
+                                        🔗 Partager
+                                    </button>
+                                    
+                                    {visiteur && visiteur.ID !== pub.Auteur_ID && (
+                                        <button className="btn-like" style={{ borderColor: idPostEnSignalement === pub.ID ? '#dc3545' : '', color: idPostEnSignalement === pub.ID ? '#dc3545' : '' }} onClick={() => ouvrirSignalementPost(pub)}>
+                                            ⚠️ Signaler
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* --- ZONE COMMENTAIRES --- */}
+                                {commentairesOuverts === pub.ID && (
+                                    <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--bg-dark)', borderRadius: '8px', borderTop: '1px solid var(--border-color)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                            <strong style={{ color: 'var(--text-light)' }}>Commentaires</strong>
+                                            <button onClick={() => setCommentairesOuverts(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1rem' }}>✖</button>
+                                        </div>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginBottom: '1rem', maxHeight: '300px', overflowY: 'auto' }}>
+                                            {listeCommentaires.length === 0 ? (
+                                                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center' }}>Aucun commentaire pour le moment. Soyez le premier !</p>
+                                            ) : (
+                                                listeCommentaires.map(c => (
+                                                    <div key={c.ID} style={{ padding: '0.8rem', backgroundColor: 'var(--bg-card)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                                                            <strong style={{ fontSize: '0.85rem', color: 'var(--orange-primary)' }}>{c.Nom}</strong>
+                                                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{c.Date_Commentaire}</span>
+                                                        </div>
+                                                        <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-light)' }}>{c.Contenu}</p>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+
+                                        {visiteur && (
+                                            <form onSubmit={(e) => handleAjouterCommentaire(e, pub.ID)} style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <input
+                                                    type="text" placeholder="Votre commentaire..." value={nouveauCommentaire} onChange={(e) => setNouveauCommentaire(e.target.value)}
+                                                    style={{ flex: 1, padding: '0.6rem 1rem', borderRadius: '25px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-light)' }} required
+                                                />
+                                                <button type="submit" className="btn-primary" style={{ padding: '0.6rem 1.5rem', borderRadius: '25px', fontSize: '0.8rem' }}>Envoyer</button>
+                                            </form>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* --- ZONE PARTAGE --- */}
+                                {pubAPartager === pub.ID && (
+                                    <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--bg-dark)', borderRadius: '8px', border: '1px solid var(--orange-primary)' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}>
+                                            <strong style={{ color: 'var(--orange-primary)', fontSize: '0.9rem' }}>Partager cette performance :</strong>
+                                            <button onClick={() => setPubAPartager(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>✖</button>
+                                        </div>
+
+                                        <div style={{ display: 'flex', marginBottom: '1rem' }}>
+                                            <button className="btn-like" style={{ width: '100%', justifyContent: 'center' }} onClick={() => {
+                                                const url = window.location.origin + "/post/" + pub.ID;
+                                                navigator.clipboard.writeText(url);
+                                                alert("Lien copié dans le presse-papier !");
+                                            }}>📋 Copier le lien</button>
+                                        </div>
+
+                                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Ou envoyer en message interne :</div>
+                                        <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+                                            {listeContacts.length === 0 ? <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Aucun contact disponible.</span> : listeContacts.map(c => (
+                                                <button key={c.ID} onClick={() => envoyerPartage(c.ID, pub)} className="btn-like" style={{ whiteSpace: 'nowrap', backgroundColor: 'var(--border-color)', color: 'var(--text-light)' }}>
+                                                    👤 {c.Nom}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* --- ZONE SIGNALEMENT --- */}
+                                {idPostEnSignalement === pub.ID && (
+                                    <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'rgba(220, 53, 69, 0.05)', borderRadius: '8px', border: '1px dashed #dc3545' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.8rem' }}><strong style={{ color: '#dc3545', fontSize: '0.9rem' }}>Signaler :</strong><button onClick={() => setIdPostEnSignalement(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>✖</button></div>
+                                        <textarea placeholder="Motif du signalement..." value={motifSignalementPost} onChange={(e) => setMotifSignalementPost(e.target.value)} rows="2" style={{ fontSize: '0.9rem', padding: '0.6rem', borderColor: '#dc3545' }} />
+                                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                            <button className="btn-primary" style={{ backgroundColor: 'var(--border-color)', color: 'var(--text-light)', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => setIdPostEnSignalement(null)}>Annuler</button>
+                                            <button className="btn-primary" style={{ backgroundColor: '#dc3545', color: 'white', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => validerSignalementPost(pub.ID)}>Envoyer</button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ))
                     )}
